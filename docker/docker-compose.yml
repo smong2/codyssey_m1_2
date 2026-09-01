@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai_assistant_app
+    ports:
+      # 사용자 요청: 포트번호 8090
+      - "8090:8090"
+    volumes:
+      # 로컬의 src 디렉토리를 컨테이너의 /app/src 와 동기화 (Hot-reload 용도)
+      - ../src:/app/src
+    env_file:
+      # 환경변수 파일 연결
+      - ../src/.env
+    restart: unless-stopped
