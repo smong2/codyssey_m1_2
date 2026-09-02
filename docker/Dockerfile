@@ -16,7 +16,4 @@ RUN pip install --no-cache-dir fastapi uvicorn firebase-admin python-dotenv pyda
 # 컨테이너 내 포트 노출 (사용자 요청: 8090)
 EXPOSE 8090
 
-# FastAPI 실행 명령어
-# src/lib/main.py 파일 내에 app 객체가 있다고 가정합니다.
-# uvicorn이 8090 포트로 모든 IP(0.0.0.0)에서 접속 가능하도록 실행합니다.
-CMD ["uvicorn", "src.lib.main:app", "--host", "0.0.0.0", "--port", "8090", "--reload"]
+CMD sh -c "uvicorn src.lib.main:app --host 0.0.0.0 --port ${PORT:-8090}"
