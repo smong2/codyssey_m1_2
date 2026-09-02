@@ -62,6 +62,7 @@
 2. **환경 변수 및 키 설정**[cite: 1]
    - `src/.env_sample` 파일을 복사하여 `src/.env` 파일을 생성합니다.
    - Firebase 서비스 계정 키(`serviceAccountKey.json`)를 `src/` 디렉토리 내에 위치시킵니다.
+   - `start.sh` 를 실행해서 docker 환경을 활성합니다. (실행이 되지 않으면 실행권한을 부여해야 함)
 
    **📋 환경 변수 목록 (`src/.env`)**
    - `OPENAI_API_KEY`: OpenAI API 인증 키[cite: 1]

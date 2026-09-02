@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 실제 환경에 맞게 필요한 패키지를 나열합니다.
 RUN pip install --no-cache-dir fastapi uvicorn firebase-admin python-dotenv pydantic pandas yfinance
 
+COPY src/ ./src/
+
 # 컨테이너 내 포트 노출 (사용자 요청: 8090)
 EXPOSE 8090
 
