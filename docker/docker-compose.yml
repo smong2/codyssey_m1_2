@@ -11,8 +11,8 @@ services:
       - "8090:8090"
     volumes:
       # 로컬의 src 디렉토리를 컨테이너의 /app/src 와 동기화 (Hot-reload 용도)
-      - ../src:/app/src
+      - ../api:/app/api
     env_file:
       # 환경변수 파일 연결
-      - ../src/.env
+      - ../api/.env
     restart: unless-stopped

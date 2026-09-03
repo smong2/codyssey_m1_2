@@ -1,5 +1,5 @@
 .DS_Store
-src/codyssey-m1-2-4cc45-firebase-adminsdk-fbsvc-141a571a58.json
-src/.env
-src/serviceAccountKey.json
-src/lib/__pycache__/*
+codyssey-m1-2-4cc45-firebase-adminsdk-fbsvc-141a571a58.json
+.env
+serviceAccountKey.json
+__pycache__/*

@@ -34,7 +34,7 @@ def get_firestore_client():
             else:
                 # 로컬 환경: 파일 경로 기반 인증
                 base_dir = os.path.dirname(os.path.abspath(__file__))
-                default_key_path = os.path.join(base_dir, "..", "serviceAccountKey.json")
+                default_key_path = os.path.join(base_dir, "serviceAccountKey.json")
                 key_path = firebase_env if firebase_env else default_key_path
                 cred = credentials.Certificate(key_path)
                 firebase_admin.initialize_app(cred)

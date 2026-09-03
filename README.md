@@ -30,27 +30,34 @@
 
 ## 📁 프로젝트 구조
 
-\`\`\`text my_ai_assistant/  
-├── docker/  
-│ ├── docker-compose.yml  
-│ └── Dockerfile # 단일 도커파일 (로컬 및 Render 배포용)  
-├── src/  
-│ ├── index.html # 메인 뷰 (채팅, 차트, 데이터 관리)  
-│ ├── css/  
-│ │ └── utility.css # Tailwind-like 커스텀 CSS & 다크모드  
-│ ├── js/  
-│ │ ├── api.js # 백엔드 통신 모듈 (fetch)  
-│ │ ├── ui.js # 다크모드, 차트 렌더링  
-│ │ └── chat.js # 채팅 UI 로직  
-│ ├── lib/ # 백엔드(FastAPI) 소스  
-│ │ ├── main.py  
-│ │ ├── database.py  
-│ │ ├── routers/  
-│ │ └── services/ # AI Function Calling 로직  
-│ ├── .env # 로컬 환경 변수  
-│ ├── .env_sample  
-│ └── serviceAccountKey.json  
-└── README.md  
+\`\`\`text my_ai_assistant/
+
+## 📁 프로젝트 구조
+
+```text
+my_ai_assistant/
+├── docker/
+│   ├── docker-compose.yml
+│   └── Dockerfile          # 단일 도커파일 (로컬 및 Render 배포용)
+├── web/                    # [Vercel 배포 타겟] 프론트엔드 UI 영역
+│   ├── index.html          # 메인 뷰 (채팅, 차트, 데이터 관리)
+│   ├── css/
+│   │   └── utility.css     # 커스텀 CSS & 다크모드
+│   └── js/
+│       ├── api.js          # 백엔드 통신 모듈 (fetch)
+│       ├── ui.js           # 다크모드, 차트 렌더링
+│       └── chat.js         # 채팅 UI 로직
+├── api/                    # [Render 배포 타겟] FastAPI 백엔드 영역
+│   ├── main.py             # FastAPI 진입점 및 라우팅 설정
+│   ├── lib/                # 비즈니스 로직 라이브러리
+│   │   ├── collect_data.py # 주가 데이터 수집기
+│   │   ├── database.py     # Firestore CRUD 로직
+│   │   └── services.py     # AI Function Calling 로직
+│   ├── .env                # 로컬 환경 변수
+│   ├── .env_sample
+│   └── serviceAccountKey.json
+├── start.sh
+└── README.md
 \`\`\`
 
 ## ⚙️ 로컬 실행 방법 (Docker 기반)
@@ -60,11 +67,11 @@
 1. **저장소 클론**[cite: 1] \`\`\`bash git clone https://github.com/smong2/codyssy_m1_2.git cd codyssy_m1_2 \`\`\`
 
 2. **환경 변수 및 키 설정**[cite: 1]
-   - `src/.env_sample` 파일을 복사하여 `src/.env` 파일을 생성합니다.
-   - Firebase 서비스 계정 키(`serviceAccountKey.json`)를 `src/` 디렉토리 내에 위치시킵니다.
+   - `api/.env_sample` 파일을 복사하여 `api/.env` 파일을 생성합니다.
+   - Firebase 서비스 계정 키(`serviceAccountKey.json`)를 `api/` 디렉토리 내에 위치시킵니다.
    - `start.sh` 를 실행해서 docker 환경을 활성합니다. (실행이 되지 않으면 실행권한을 부여해야 함)
 
-   **📋 환경 변수 목록 (`src/.env`)**
+   **📋 환경 변수 목록 (`api/.env`)**
    - `OPENAI_API_KEY`: OpenAI API 인증 키[cite: 1]
    - `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase 서비스 계정 키 (JSON 문자열 또는 경로)[cite: 1]
    - `API_BASE_URL`: 프론트엔드에서 참조할 백엔드 주소 (로컬 구동 시 `http://localhost:8090`)[cite: 1]
@@ -81,3 +88,4 @@
 - **데이터 요약 및 채팅 화면** (Chart.js 시각화 및 다크모드 적용 모습 포함)[cite: 1]
 - **투자 기록 관리(CRUD) 화면** (데이터 추가/수정/삭제 및 내보내기 버튼 동작 확인)[cite: 1]
 - **대화 내역 불러오기 화면**[cite: 1]
+```
