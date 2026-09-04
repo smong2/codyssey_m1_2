@@ -1,18 +1,28 @@
 version: "3.8"
 
 services:
+  # 1. 백엔드 서버 (FastAPI - 포트 8090)
   app:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     container_name: ai_assistant_app
     ports:
-      # 사용자 요청: 포트번호 8090
       - "8090:8090"
     volumes:
-      # 로컬의 src 디렉토리를 컨테이너의 /app/src 와 동기화 (Hot-reload 용도)
       - ../api:/app/api
     env_file:
-      # 환경변수 파일 연결
       - ../api/.env
+    restart: unless-stopped
+
+  # 2. 프론트엔드 서버 (Local 전용 - 포트 3000)
+  web:
+    image: python:3.10-slim
+    container_name: ai_assistant_web
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../web:/app/web
+    working_dir: /app/web
+    command: python -m http.server 3000
     restart: unless-stopped

@@ -42,17 +42,18 @@ my_ai_assistant/
 ├── web/                    # [Vercel 배포 타겟] 프론트엔드 UI 영역
 │   ├── index.html          # 메인 뷰 (채팅, 차트, 데이터 관리)
 │   ├── css/
-│   │   └── utility.css     # 커스텀 CSS & 다크모드
+│   │   └── style.css       # 커스텀 CSS & 다크모드
 │   └── js/
 │       ├── api.js          # 백엔드 통신 모듈 (fetch)
-│       ├── ui.js           # 다크모드, 차트 렌더링
+│       ├── app.js          # 공통 UI 및 초기화 로직
+│       ├── data.js         # 데이터 CRUD 및 차트 렌더링
 │       └── chat.js         # 채팅 UI 로직
 ├── api/                    # [Render 배포 타겟] FastAPI 백엔드 영역
 │   ├── main.py             # FastAPI 진입점 및 라우팅 설정
 │   ├── lib/                # 비즈니스 로직 라이브러리
 │   │   ├── collect_data.py # 주가 데이터 수집기
 │   │   ├── database.py     # Firestore CRUD 로직
-│   │   └── services.py     # AI Function Calling 로직
+│   │   └── ai_service.py   # AI Function Calling 로직
 │   ├── .env                # 로컬 환경 변수
 │   ├── .env_sample
 │   └── serviceAccountKey.json
@@ -80,7 +81,7 @@ my_ai_assistant/
 3. **Docker Compose 실행** 최상위 디렉토리(root)에서 아래 명령어를 실행하여 컨테이너를 빌드하고 실행합니다. \`\`\`bash docker compose -f docker/docker-compose.yml up --build \`\`\`
 
 4. **서비스 접속**
-   - **Frontend UI**: `http://localhost:8090`
+   - **Frontend UI**: `http://localhost:3000`
    - **Backend API Docs (Swagger)**: `http://localhost:8090/docs`
 
 ## 📸 실행 스크린샷[cite: 1]

@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 파이썬 패키지 설치 (yfinance 등 분석 도구 포함)
 # 실제 환경에 맞게 필요한 패키지를 나열합니다.
-RUN pip install --no-cache-dir fastapi uvicorn firebase-admin python-dotenv pydantic pandas yfinance
+RUN pip install --no-cache-dir fastapi uvicorn firebase-admin python-dotenv pydantic pandas yfinance google-generativeai
 
 COPY api/ ./api/
 

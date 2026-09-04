@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>삼성전자 AI 투자 비서</title>
+		<!-- 폰트 및 아이콘, 차트 라이브러리 -->
+		<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<!-- 커스텀 스타일 -->
+		<link rel="stylesheet" href="css/style.css" />
+	</head>
+	<body>
+		<!-- 1. GNB 영역 -->
+		<header class="gnb">
+			<div class="logo"><i class="fa-solid fa-chart-line"></i> 삼성전자 AI 투자 비서</div>
+			<div class="gnb-controls">
+				<button id="btn-export" class="icon-btn" title="데이터 CSV 내보내기"><i class="fa-solid fa-download"></i> 내보내기</button>
+				<button id="btn-theme" class="icon-btn" title="다크모드 토글">
+					<i class="fa-solid fa-moon"></i>
+				</button>
+			</div>
+		</header>
+
+		<!-- 2. 전체 앱 컨테이너 -->
+		<div class="app-container">
+			<!-- 좌측: 대화 기록 사이드바 -->
+			<aside class="sidebar">
+				<div class="sidebar-header">
+					<h3>이전 대화 기록</h3>
+					<button id="btn-new-chat" class="icon-btn"><i class="fa-solid fa-plus"></i></button>
+				</div>
+				<ul id="conversation-list" class="history-list">
+					<!-- JS로 대화 목록 렌더링 -->
+				</ul>
+			</aside>
+
+			<!-- 우측: 메인 콘텐츠 영역 -->
+			<div class="main-content">
+				<!-- 우측 상단: 데이터 대시보드 -->
+				<main class="dashboard card">
+					<header class="dashboard-header">
+						<h2>📈 주가 데이터 요약 및 차트</h2>
+					</header>
+					<div class="summary-stats" id="summary-stats">
+						<!-- JS로 통계 렌더링 -->
+					</div>
+					<div class="chart-container">
+						<canvas id="stockChart"></canvas>
+					</div>
+
+					<hr style="border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0 1rem 0" />
+					<div class="portfolio-section">
+						<h3 style="margin-bottom: 1rem">💼 나의 가상 투자 기록</h3>
+
+						<!-- 입력 폼 -->
+						<div class="chat-input-area" style="margin-bottom: 1rem">
+							<input type="date" id="port-date" style="flex: 1" />
+							<input type="number" id="port-price" placeholder="매수 단가 (원)" style="flex: 1.5" />
+							<input type="number" id="port-qty" placeholder="수량 (주)" style="flex: 1" />
+							<button id="btn-add-portfolio">기록 추가</button>
+						</div>
+
+						<!-- 데이터 출력 테이블 -->
+						<table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 0.95rem">
+							<thead>
+								<tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted)">
+									<th style="padding: 0.5rem 0">매수일</th>
+									<th>매수 단가</th>
+									<th>수량</th>
+									<th>총 투자금</th>
+									<th>관리</th>
+								</tr>
+							</thead>
+							<tbody id="portfolio-list">
+								<!-- JS로 렌더링 -->
+							</tbody>
+						</table>
+					</div>
+				</main>
+
+				<!-- 우측 하단: AI 채팅창 -->
+				<section class="chat-section card">
+					<div class="chat-messages" id="chat-messages">
+						<div class="message ai-message">안녕하세요! 삼성전자 주가 데이터가 준비되어 있습니다. 무엇을 분석해 드릴까요?</div>
+					</div>
+					<div class="chat-input-area">
+						<input type="text" id="chat-input" placeholder="AI에게 투자 인사이트를 물어보세요..." />
+						<button id="btn-send"><i class="fa-solid fa-paper-plane"></i></button>
+					</div>
+				</section>
+			</div>
+		</div>
+
+		<!-- 공통 JS -->
+		<script src="js/api.js"></script>
+		<script src="js/app.js"></script>
+		<!-- 추후 세부 기능 구현 시 주석 해제하여 사용할 파일들 -->
+		<script src="js/data.js"></script>
+		<script src="js/chat.js"></script>
+	</body>
+</html>

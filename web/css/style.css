@@ -1,0 +1,180 @@
+/* 공통 변수 정의 (라이트 모드) */
+:root {
+	--bg-color: #f4f6f9;
+	--card-bg: #ffffff;
+	--text-main: #333333;
+	--text-muted: #6c757d;
+	--border-color: #e9ecef;
+	--primary-color: #0056b3;
+	--hover-color: #e2e6ea;
+	--ai-msg-bg: #f1f3f5;
+	--user-msg-bg: #dbe4ff;
+}
+
+/* 다크 모드 변수 덮어쓰기 */
+body.dark-mode {
+	--bg-color: #121212;
+	--card-bg: #1e1e1e;
+	--text-main: #e0e0e0;
+	--text-muted: #a0a0a0;
+	--border-color: #333333;
+	--primary-color: #4da3ff;
+	--hover-color: #2c2c2c;
+	--ai-msg-bg: #2a2a2a;
+	--user-msg-bg: #1a365d;
+}
+
+/* 초기화 및 공통 스타일 */
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	font-family: "Noto Sans KR", sans-serif;
+	background-color: var(--bg-color);
+	color: var(--text-main);
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	transition:
+		background-color 0.3s,
+		color 0.3s;
+}
+
+/* GNB 영역 */
+.gnb {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 1rem 2rem;
+	background-color: var(--card-bg);
+	border-bottom: 1px solid var(--border-color);
+}
+.gnb .logo {
+	font-weight: 700;
+	font-size: 1.2rem;
+	color: var(--primary-color);
+}
+.icon-btn {
+	background: none;
+	border: none;
+	color: var(--text-main);
+	font-size: 1.1rem;
+	cursor: pointer;
+	padding: 0.5rem;
+	border-radius: 4px;
+}
+.icon-btn:hover {
+	background-color: var(--hover-color);
+}
+
+/* 레이아웃 뼈대 */
+.app-container {
+	display: flex;
+	flex: 1;
+	overflow: hidden;
+}
+
+/* 사이드바 */
+.sidebar {
+	width: 250px;
+	background-color: var(--card-bg);
+	border-right: 1px solid var(--border-color);
+	display: flex;
+	flex-direction: column;
+}
+.sidebar-header {
+	padding: 1rem;
+	display: flex;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--border-color);
+}
+.history-list {
+	list-style: none;
+	overflow-y: auto;
+	flex: 1;
+}
+
+/* 메인 콘텐츠 (대시보드 + 채팅창) */
+.main-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	padding: 1rem;
+	gap: 1rem;
+	overflow-y: auto;
+}
+
+/* 카드 컴포넌트 */
+.card {
+	background-color: var(--card-bg);
+	border-radius: 8px;
+	border: 1px solid var(--border-color);
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+}
+
+/* 대시보드 영역 */
+.dashboard {
+	flex: none;
+	height: auto;
+}
+.chart-container {
+	position: relative;
+	height: 300px;
+	width: 100%;
+}
+
+/* 채팅 영역 */
+.chat-section {
+	flex: none;
+	min-height: 400px;
+}
+.chat-messages {
+	flex: 1;
+	overflow-y: auto;
+	margin-bottom: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+.message {
+	padding: 0.8rem 1rem;
+	border-radius: 8px;
+	max-width: 80%;
+	line-height: 1.5;
+}
+.ai-message {
+	background-color: var(--ai-msg-bg);
+	align-self: flex-start;
+	border-bottom-left-radius: 0;
+}
+.user-message {
+	background-color: var(--user-msg-bg);
+	align-self: flex-end;
+	border-bottom-right-radius: 0;
+}
+
+.chat-input-area {
+	display: flex;
+	gap: 0.5rem;
+}
+.chat-input-area input {
+	flex: 1;
+	padding: 0.8rem;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background: var(--bg-color);
+	color: var(--text-main);
+}
+.chat-input-area button {
+	padding: 0 1.5rem;
+	background-color: var(--primary-color);
+	color: white;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
