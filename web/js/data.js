@@ -4,9 +4,31 @@
  */
 
 let stockChartInstance = null; // 차트 인스턴스 전역 관리 (업데이트 시 기존 차트 파괴 용도)
+let allStockData = []; // 서버에서 불러온 전체 데이터 원본 저장
+let currentChartType = "line"; // 현재 차트 타입 (line 또는 box)
+let currentFilterDays = 20; // 기본 1개월
 
 document.addEventListener("DOMContentLoaded", () => {
 	fetchAndRenderData();
+	fetchPortfolio();
+	document.getElementById("btn-add-portfolio").addEventListener("click", addPortfolioItem);
+
+	// 차트 기간 필터 버튼 이벤트
+	document.querySelectorAll(".filter-btn").forEach((btn) => {
+		btn.addEventListener("click", (e) => {
+			document.querySelectorAll(".filter-btn").forEach((b) => (b.style.backgroundColor = "var(--bg-color)"));
+			e.target.style.backgroundColor = "var(--hover-color)";
+
+			currentFilterDays = parseInt(e.target.dataset.days);
+			applyChartFilter(currentFilterDays);
+		});
+	});
+
+	// 차트 타입 선택 이벤트
+	document.getElementById("chart-type").addEventListener("change", (e) => {
+		currentChartType = e.target.value;
+		applyChartFilter(currentFilterDays); // 타입 변경 시 차트 리렌더링
+	});
 });
 
 /**
@@ -14,23 +36,60 @@ document.addEventListener("DOMContentLoaded", () => {
  */
 async function fetchAndRenderData() {
 	const summaryContainer = document.getElementById("summary-stats");
-	summaryContainer.innerHTML = '<p><i class="fa-solid fa-spinner fa-spin"></i> 데이터를 불러오는 중입니다...</p>';
+	summaryContainer.innerHTML = '<p style="padding:1rem;"><i class="fa-solid fa-spinner fa-spin"></i> 통계 및 차트를 불러오는 중...</p>';
 
 	try {
-		// api.js의 apiFetch를 사용해 최근 100일치 데이터 조회
-		const response = await window.API.apiFetch("/api/data?limit=100");
-
+		const response = await window.API.apiFetch("/api/data?limit=2500");
 		if (response.status === "success" && response.data.length > 0) {
-			// 차트를 그리기 위해 날짜 오름차순(과거 -> 최신)으로 배열 뒤집기
-			const stockData = response.data.reverse();
+			allStockData = response.data.reverse();
 
-			renderSummary(stockData);
-			renderChart(stockData);
-		} else {
-			summaryContainer.innerHTML = "<p>조회된 주가 데이터가 없습니다.</p>";
+			// 초기 렌더링 (1개월 기준)
+			document.querySelector('.filter-btn[data-days="20"]').style.backgroundColor = "var(--hover-color)";
+			applyChartFilter(currentFilterDays);
 		}
 	} catch (error) {
-		summaryContainer.innerHTML = `<p style="color: #ff4d4f;">❌ 데이터 로딩 실패: ${error.message}</p>`;
+		summaryContainer.innerHTML = `<p style="color: #ff4d4f;">❌ 로딩 실패: ${error.message}</p>`;
+	}
+}
+
+async function applyChartFilter(days) {
+	if (allStockData.length === 0) return;
+
+	// 차트용 데이터 필터링
+	const filteredData = allStockData.slice(-days);
+	renderChart(filteredData, currentChartType);
+
+	// ✨ 통계 요약 API 호출 및 렌더링 (보너스 과제)
+	try {
+		const summaryResponse = await window.API.apiFetch(`/api/data/summary?limit=${days}`);
+		if (summaryResponse.status === "success") {
+			const s = summaryResponse.summary;
+			const trendColor = s.trend === "상승" ? "#ff4d4f" : s.trend === "하락" ? "#1890ff" : "var(--text-main)";
+
+			document.getElementById("summary-stats").innerHTML = `
+                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">조회 기간 (영업일 기준 ${s.count}일)</div>
+                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">${s.period}</div>
+                </div>
+                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">평균 종가 / 최근 추세</div>
+                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">
+                        ${s.average.toLocaleString()}원 <span style="color:${trendColor}">(${s.trend})</span>
+                    </div>
+                </div>
+                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">최고 / 최저 (원)</div>
+                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px; color:#ff4d4f;">${s.max.toLocaleString()}</div>
+                    <div style="font-size: 1rem; font-weight: bold; color:#1890ff;">${s.min.toLocaleString()}</div>
+                </div>
+                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px; border-left: 3px solid #8e44ad;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">가격 변동성 (보너스 지표)</div>
+                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">±${s.volatility.toLocaleString()}</div>
+                </div>
+            `;
+		}
+	} catch (e) {
+		console.error("통계 요약 로딩 실패:", e);
 	}
 }
 
@@ -83,61 +142,75 @@ function renderSummary(data) {
 /**
  * Chart.js를 이용해 주가 추세선을 그립니다.
  */
-function renderChart(data) {
+function renderChart(data, type) {
 	const ctx = document.getElementById("stockChart").getContext("2d");
-
 	const labels = data.map((item) => item.date);
-	const prices = data.map((item) => item.value);
 
-	// 기존 차트가 있다면 파괴 후 다시 그림 (중복 렌더링 방지)
-	if (stockChartInstance) {
-		stockChartInstance.destroy();
+	// ✨ 다크모드 대응: body에 설정된 --border-color 속성을 읽어와 격자색으로 사용
+	const gridColor = getComputedStyle(document.body).getPropertyValue("--border-color") || "rgba(0,0,0,0.1)";
+	const textColor = getComputedStyle(document.body).getPropertyValue("--text-muted") || "#666";
+
+	let datasets = [];
+
+	if (type === "line") {
+		datasets = [
+			{
+				type: "line",
+				label: "삼성전자 종가 (원)",
+				data: data.map((item) => item.close || item.value),
+				borderColor: "#0056b3",
+				backgroundColor: "rgba(0, 86, 179, 0.1)",
+				borderWidth: 2,
+				pointRadius: data.length > 50 ? 0 : 3, // 데이터가 많으면 점 숨김
+				pointHoverRadius: 6,
+				fill: true,
+				tension: 0.4,
+			},
+		];
+	} else {
+		// 박스 차트 (시가-종가)
+		const boxData = data.map((item) => {
+			const o = item.open || item.value;
+			const c = item.close || item.value;
+			return [Math.min(o, c), Math.max(o, c)];
+		});
+		const boxColors = data.map((item) => {
+			const o = item.open || item.value;
+			const c = item.close || item.value;
+			return c >= o ? "rgba(255, 77, 79, 0.8)" : "rgba(24, 144, 255, 0.8)";
+		});
+
+		datasets = [
+			{
+				type: "bar",
+				label: "시가-종가 변동폭",
+				data: boxData,
+				backgroundColor: boxColors,
+				borderWidth: 1,
+				borderColor: boxColors,
+			},
+		];
 	}
 
+	if (stockChartInstance) stockChartInstance.destroy();
+
 	stockChartInstance = new Chart(ctx, {
-		type: "line",
-		data: {
-			labels: labels,
-			datasets: [
-				{
-					label: "삼성전자 종가 (원)",
-					data: prices,
-					borderColor: "#0056b3",
-					backgroundColor: "rgba(0, 86, 179, 0.1)",
-					borderWidth: 2,
-					pointRadius: 1, // 데이터 포인트 크기 축소
-					pointHoverRadius: 5,
-					fill: true,
-					tension: 0.1, // 선의 곡률
-				},
-			],
-		},
+		data: { labels: labels, datasets: datasets },
 		options: {
 			responsive: true,
-			maintainAspectRatio: false, // 컨테이너 크기에 맞게 조절
+			maintainAspectRatio: false,
 			plugins: {
-				legend: { display: false },
-				tooltip: {
-					callbacks: {
-						label: function (context) {
-							return context.parsed.y.toLocaleString() + "원";
-						},
-					},
-				},
+				legend: { display: true, position: "top", labels: { color: textColor } },
+				tooltip: { mode: "index", intersect: false },
 			},
 			scales: {
 				x: {
-					ticks: {
-						maxTicksLimit: 10, // X축 라벨 개수 제한
-						color: getComputedStyle(document.body).getPropertyValue("--text-muted"),
-					},
-					grid: { color: "rgba(0,0,0,0.05)" },
+					ticks: { color: textColor, maxTicksLimit: 15 },
+					grid: { color: gridColor },
 				},
 				y: {
-					ticks: {
-						color: getComputedStyle(document.body).getPropertyValue("--text-muted"),
-					},
-					grid: { color: "rgba(0,0,0,0.05)" },
+					ticks: { color: textColor },
+					grid: { color: gridColor },
 				},
 			},
 		},
@@ -163,17 +236,31 @@ async function fetchPortfolio() {
 
 function renderPortfolio(data) {
 	const tbody = document.getElementById("portfolio-list");
-	if (data.length === 0) {
-		tbody.innerHTML = '<tr><td colspan="5" style="padding:1rem; text-align:center; color: var(--text-muted);">투자 기록이 없습니다.</td></tr>';
-		return;
-	}
+	const summaryDiv = document.getElementById("portfolio-summary");
+
+	let totalBuy = 0,
+		totalBuyQty = 0;
+	let totalSell = 0,
+		totalSellQty = 0;
 
 	tbody.innerHTML = data
 		.map((item) => {
+			const isBuy = item.trade_type === "buy";
 			const total = item.price * item.quantity;
+
+			if (isBuy) {
+				totalBuy += total;
+				totalBuyQty += item.quantity;
+			} else {
+				totalSell += total;
+				totalSellQty += item.quantity;
+			}
+
+			const typeBadge = isBuy ? `<span style="color:#ff4d4f">매수</span>` : `<span style="color:#1890ff">매도</span>`;
+
 			return `
             <tr style="border-bottom: 1px solid var(--border-color);">
-                <td style="padding: 0.8rem 0;">${item.date}</td>
+                <td style="padding: 0.8rem 0;">${item.date}<br><small>${typeBadge}</small></td>
                 <td>${item.price.toLocaleString()}원</td>
                 <td>${item.quantity.toLocaleString()}주</td>
                 <td>${total.toLocaleString()}원</td>
@@ -184,12 +271,23 @@ function renderPortfolio(data) {
         `;
 		})
 		.join("");
+
+	// 단순 누적 기반 실현 수익 및 보유 현황 표시
+	const currentHolding = totalBuyQty - totalSellQty;
+	const realizedProfit = totalSell - totalBuy * (totalSellQty / (totalBuyQty || 1)); // 평단가 기반 단순 실현수익
+	const profitRate = totalSellQty > 0 ? ((realizedProfit / (totalBuy * (totalSellQty / totalBuyQty))) * 100).toFixed(2) : 0;
+
+	summaryDiv.innerHTML = `
+        현재 보유 수량: ${currentHolding}주 | 
+        총 매도 수익실현: <span style="color: ${realizedProfit >= 0 ? "#ff4d4f" : "#1890ff"}">${realizedProfit.toLocaleString()}원 (${profitRate}%)</span>
+    `;
 }
 
 /**
  * 포트폴리오 새 기록 추가 (POST)
  */
 async function addPortfolioItem() {
+	const type = document.getElementById("port-type").value;
 	const date = document.getElementById("port-date").value;
 	const price = document.getElementById("port-price").value;
 	const quantity = document.getElementById("port-qty").value;
@@ -203,6 +301,7 @@ async function addPortfolioItem() {
 		const response = await window.API.apiFetch("/api/portfolio", {
 			method: "POST",
 			body: JSON.stringify({
+				trade_type: type,
 				date: date,
 				price: parseFloat(price),
 				quantity: parseInt(quantity, 10),

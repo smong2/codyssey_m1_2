@@ -40,10 +40,26 @@
 			<div class="main-content">
 				<!-- 우측 상단: 데이터 대시보드 -->
 				<main class="dashboard card">
-					<header class="dashboard-header">
-						<h2>📈 주가 데이터 요약 및 차트</h2>
+					<header class="dashboard-header" style="display: flex; flex-direction: column; gap: 1rem">
+						<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem">
+							<h2>📈 주가 데이터 요약 및 차트</h2>
+							<!-- 차트 컨트롤 -->
+							<div id="chart-controls" style="display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap">
+								<select id="chart-type" style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main)">
+									<option value="line">꺾은선 차트</option>
+									<option value="box">박스(캔들) 차트</option>
+								</select>
+								<div id="chart-filters" style="display: flex; gap: 0.5rem">
+									<button class="filter-btn" data-days="1" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1일</button>
+									<button class="filter-btn" data-days="5" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1주</button>
+									<button class="filter-btn" data-days="20" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1개월</button>
+									<button class="filter-btn" data-days="250" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1년</button>
+								</div>
+							</div>
+						</div>
 					</header>
-					<div class="summary-stats" id="summary-stats">
+
+					<div class="summary-stats" id="summary-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1rem">
 						<!-- JS로 통계 렌더링 -->
 					</div>
 					<div class="chart-container">
@@ -56,10 +72,19 @@
 
 						<!-- 입력 폼 -->
 						<div class="chat-input-area" style="margin-bottom: 1rem">
+							<select id="port-type" style="flex: 0.5; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color)">
+								<option value="buy">매수</option>
+								<option value="sell">매도</option>
+							</select>
 							<input type="date" id="port-date" style="flex: 1" />
-							<input type="number" id="port-price" placeholder="매수 단가 (원)" style="flex: 1.5" />
+							<input type="number" id="port-price" placeholder="단가 (원)" style="flex: 1.5" />
 							<input type="number" id="port-qty" placeholder="수량 (주)" style="flex: 1" />
 							<button id="btn-add-portfolio">기록 추가</button>
+						</div>
+
+						<!-- 수익 현황 요약 영역 (테이블 위쪽에 추가) -->
+						<div id="portfolio-summary" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-color); border-radius: 8px; font-weight: bold; color: var(--text-main)">
+							<!-- JS에서 렌더링 (총 수익금, 수익률 등) -->
 						</div>
 
 						<!-- 데이터 출력 테이블 -->

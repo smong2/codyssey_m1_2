@@ -3,3 +3,4 @@ codyssey-m1-2-4cc45-firebase-adminsdk-fbsvc-141a571a58.json
 .env
 serviceAccountKey.json
 __pycache__/*
+*.pyc
