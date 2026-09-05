@@ -41,7 +41,6 @@ def initialize_firebase():
     return firestore.client()
 
 # 3. 주식 데이터 수집 및 Firestore('stock_data') 업로드 핵심 함수
-# -> 향후 웹 API(FastAPI)에서 특정 날짜나 기간을 지정해 호출할 수 있도록 설계됨
 def fetch_and_save_stock_data(period: str = "10y", start: str = None, end: str = None):
     db = initialize_firebase()
     ticker = "005930.KS"  # 삼성전자 종목 코드
@@ -80,17 +79,20 @@ def fetch_and_save_stock_data(period: str = "10y", start: str = None, end: str =
         low_price = float(row['Low']) if 'Low' in row and not pd.isna(row['Low']) else 0
         volume = int(row['Volume']) if 'Volume' in row and not pd.isna(row['Volume']) else 0
         
-        # 코디세이 필수 규격 준수: (date, value, memo)
-        # memo 필드에 시가, 고가, 저가, 거래량 등 추가 변수를 압축 저장하여 AI 분석력 강화
         memo_str = f"시가:{open_price}, 고가:{high_price}, 저가:{low_price}, 거래량:{volume}"
         
+        # SQLite 캐싱 및 박스 차트(캔들스틱) 대응을 위해 OHLC 데이터를 개별 필드로 분리 저장
         doc_data = {
             "date": date_str,
-            "value": close_price,       # 핵심 지표 (종가)
-            "memo": memo_str            # 부가 변수 정보
+            "open": open_price,
+            "high": high_price,
+            "low": low_price,
+            "close": close_price,
+            "value": close_price,  # 기존 코드 하위 호환성 유지용
+            "volume": volume,
+            "memo": memo_str       # 기존 문자열 압축 정보
         }
         
-        # 문서 ID를 날짜(YYYY-MM-DD)로 설정하여 중복 방지 및 웹 조회 용이성 확보
         doc_ref = collection_ref.document(date_str)
         batch.set(doc_ref, doc_data)
         batch_count += 1
@@ -107,9 +109,21 @@ def fetch_and_save_stock_data(period: str = "10y", start: str = None, end: str =
         batch.commit()
 
     print(f"🎉 'stock_data' 컬렉션에 총 {total_saved}건 업로드 완료!")
+
+    # ================================================================
+    # 🚀 신규 로직: 데이터 수집 완료 후 메타데이터(버전) 증가
+    # ================================================================
+    if total_saved > 0:
+        try:
+            meta_ref = db.collection("metadata").document("stock_status")
+            # firestore.Increment(1)을 사용하면 기존 버전에 +1을 더함 (문서가 없으면 1로 자동 생성됨)
+            meta_ref.set({"version": firestore.Increment(1)}, merge=True)
+            print("🔄 [Cache Sync] 메타데이터 버전 업데이트 완료! 백엔드의 SQLite 캐시가 자동으로 무효화 및 갱신됩니다.")
+        except Exception as e:
+            print(f"⚠️ 메타데이터 버전 업데이트 실패: {e}")
+
     return total_saved
 
 # 4. CLI 직접 실행 시 진입점
 if __name__ == "__main__":
-    # 현재는 CLI에서 10년 치 전체 데이터를 한 번에 적재
     fetch_and_save_stock_data(period="10y")
