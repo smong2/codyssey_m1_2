@@ -3,7 +3,7 @@
  * AI 채팅 UI 이벤트, 백엔드 통신, 사이드바 대화 기록을 담당합니다.
  */
 
-let currentConversationId = null; // 현재 활성화된 대화방 ID
+let currentConversationId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
 	const btnSend = document.getElementById("btn-send");
@@ -16,13 +16,14 @@ document.addEventListener("DOMContentLoaded", () => {
 	});
 	btnNewChat.addEventListener("click", startNewChat);
 
-	// 페이지 로드 시 사이드바 목록 불러오기
 	loadConversationList();
+
+	// ✨ DOM 변화 감지 (MutationObserver): 표(Table)나 이미지가 렌더링되면서 높이가 변할 때 스크롤 꼬임 방지
+	const chatContainer = document.getElementById("chat-messages");
+	const observer = new MutationObserver(scrollToBottom);
+	observer.observe(chatContainer, { childList: true, subtree: true });
 });
 
-/**
- * 1. 메시지 전송 및 AI 응답 처리
- */
 async function sendMessage() {
 	const inputEl = document.getElementById("chat-input");
 	const message = inputEl.value.trim();
@@ -36,7 +37,6 @@ async function sendMessage() {
 
 	try {
 		const bodyData = { message: message };
-		// 기존 대화방이 있다면 ID를 함께 전송
 		if (currentConversationId) {
 			bodyData.conversation_id = currentConversationId;
 		}
@@ -51,7 +51,6 @@ async function sendMessage() {
 		if (response.status === "success") {
 			appendMessage("ai", response.reply);
 
-			// 첫 질문이어서 새 방이 파진 경우 ID 갱신 및 사이드바 업데이트
 			if (!currentConversationId) {
 				currentConversationId = response.conversation_id;
 				loadConversationList();
@@ -63,16 +62,12 @@ async function sendMessage() {
 	}
 }
 
-/**
- * 2. 사이드바 대화 목록 불러오기
- */
 async function loadConversationList() {
 	const listEl = document.getElementById("conversation-list");
 	const response = await window.API.apiFetch("/api/conversations");
 	if (response.status === "success") {
 		listEl.innerHTML = response.data
 			.map((conv) => {
-				// 현재 활성화된 방이면 배경색 다르게 처리
 				const isActive = conv.id === currentConversationId;
 				const bgStyle = isActive ? "background-color: var(--hover-color); font-weight: bold;" : "";
 
@@ -114,13 +109,8 @@ async function editTitle(convId, oldTitle, event) {
 	}
 }
 
-/**
- * [신규] 사이드바 대화방 삭제
- */
 async function deleteConversation(convId, event) {
-	// 부모 요소(li)의 onclick 이벤트(대화 불러오기)가 실행되는 것을 차단
 	event.stopPropagation();
-
 	if (!confirm("이 대화 기록을 정말 삭제하시겠습니까?")) return;
 
 	try {
@@ -129,11 +119,9 @@ async function deleteConversation(convId, event) {
 		});
 
 		if (response.status === "success") {
-			// 삭제한 방이 현재 열려있는 방이라면 채팅창 초기화
 			if (currentConversationId === convId) {
 				startNewChat();
 			}
-			// 목록 새로고침
 			loadConversationList();
 		}
 	} catch (error) {
@@ -141,9 +129,6 @@ async function deleteConversation(convId, event) {
 	}
 }
 
-/**
- * 3. 과거 대화 내역 불러와서 채팅창에 뿌리기
- */
 async function loadConversationDetail(convId) {
 	currentConversationId = convId;
 	loadConversationList();
@@ -154,13 +139,12 @@ async function loadConversationDetail(convId) {
 	try {
 		const response = await window.API.apiFetch(`/api/conversations/${convId}`);
 		if (response.status === "success") {
-			chatContainer.innerHTML = ""; // 초기화
+			chatContainer.innerHTML = "";
 			const messages = response.data.messages;
 
 			messages.forEach((msg) => {
 				appendMessage(msg.role, msg.content);
 			});
-			// 대화 내역을 모두 렌더링한 후 스크롤을 최하단으로 강제 이동
 			scrollToBottom();
 		}
 	} catch (error) {
@@ -168,9 +152,6 @@ async function loadConversationDetail(convId) {
 	}
 }
 
-/**
- * 4. 새 대화 시작하기 (초기화)
- */
 function startNewChat() {
 	currentConversationId = null;
 	const chatContainer = document.getElementById("chat-messages");
@@ -180,21 +161,57 @@ function startNewChat() {
         </div>
     `;
 	scrollToBottom();
-	// 활성화된 채팅방 배경색 초기화를 위해 목록 새로고침
 	loadConversationList();
 }
 
-// --- 아래 UI 관련 공통 함수 (appendMessage, appendLoading, removeLoading) ---
+/**
+ * ✨ 매우 단순한 마크다운 표 변환기 (LLM이 출력한 | 표를 HTML로 렌더링)
+ */
+function parseMarkdownTable(text) {
+	if (!text.includes("|")) return text.replace(/\n/g, "<br>");
+
+	const lines = text.split("\n");
+	let html = "";
+	let inTable = false;
+
+	for (let line of lines) {
+		if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
+			if (!inTable) {
+				html += "<table><tbody>";
+				inTable = true;
+			}
+			// 구분선(|---|) 무시
+			if (line.includes("---")) continue;
+
+			const cells = line
+				.split("|")
+				.slice(1, -1)
+				.map((c) => c.trim());
+			html += "<tr>" + cells.map((c) => `<td>${c}</td>`).join("") + "</tr>";
+		} else {
+			if (inTable) {
+				html += "</tbody></table><br>";
+				inTable = false;
+			}
+			html += line + "<br>";
+		}
+	}
+	if (inTable) html += "</tbody></table>";
+
+	// 테이블 내의 첫 번째 줄(tr)의 td를 th로 강제 변경하여 헤더 효과 부여
+	return html.replace(/<tr>(<td>.*?<\/td>)<\/tr>/i, (match) => {
+		return match.replace(/<td/g, "<th").replace(/<\/td>/g, "</th>");
+	});
+}
+
 function appendMessage(sender, text) {
 	const chatContainer = document.getElementById("chat-messages");
 	const msgDiv = document.createElement("div");
 	msgDiv.className = `message ${sender === "ai" ? "ai-message" : "user-message"}`;
 
-	// 줄바꿈 문자를 <br>로 변환하여 출력
-	msgDiv.innerHTML = text.replace(/\n/g, "<br>");
+	// 마크다운 표 변환 적용
+	msgDiv.innerHTML = parseMarkdownTable(text);
 	chatContainer.appendChild(msgDiv);
-
-	// 메시지가 추가될 때마다 확실하게 스크롤 하단 이동 보장
 	scrollToBottom();
 }
 
@@ -211,15 +228,12 @@ function appendLoading() {
 	const loadingPhrases = ["AI가 시장 데이터를 분석 중입니다...", "과거 투자 기록과 수익률을 대조 중입니다...", "답변을 정교하게 작성 중입니다..."];
 	let phraseIndex = 0;
 
-	// 즉시 첫 문구 렌더링
 	loadingDiv.innerHTML = `<i class="fa-solid fa-ellipsis fa-fade"></i> ${loadingPhrases[phraseIndex]}`;
 	scrollToBottom();
 
-	// 1.5초마다 문구 변경 및 스크롤 고정
 	loadingInterval = setInterval(() => {
 		phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
 		loadingDiv.innerHTML = `<i class="fa-solid fa-ellipsis fa-fade"></i> ${loadingPhrases[phraseIndex]}`;
-		scrollToBottom();
 	}, 1500);
 
 	return id;
@@ -232,17 +246,20 @@ function removeLoading(id) {
 }
 
 /**
- * 렌더링 타이밍을 고려하여 확실하게 스크롤을 최하단으로 내리는 함수
+ * ✨ 확실하게 스크롤을 최하단으로 내리는 함수 (더블 체크 로직)
  */
 function scrollToBottom() {
 	const chatContainer = document.getElementById("chat-messages");
 	if (!chatContainer) return;
 
-	// setTimeout을 통해 DOM이 완전히 업데이트된 후 높이를 재계산하여 스크롤
+	// 즉시 스크롤
+	chatContainer.scrollTop = chatContainer.scrollHeight;
+
+	// 브라우저 렌더링(리플로우) 완료 후 한 번 더 스크롤 (부드럽게)
 	setTimeout(() => {
 		chatContainer.scrollTo({
 			top: chatContainer.scrollHeight,
 			behavior: "smooth",
 		});
-	}, 50);
+	}, 100);
 }
