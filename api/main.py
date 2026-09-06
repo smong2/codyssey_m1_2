@@ -144,43 +144,55 @@ def get_cached_stock_data_with_version():
 # ==========================================
 
 def query_stock_data(intent: str, start_date: str = None, end_date: str = None, target_date: str = None) -> str:
+    """
+    SQLite DB에서 과거 주가 데이터를 조회합니다. (존재 기간: 2016년 8월 ~ 현재)
+    사용자가 과거의 특정 연도, 특정 월(예: 2026년 7월), 특정 일자의 데이터를 물어보면 반드시 이 도구를 호출하세요.
+    
+    Args:
+        intent: 'summary'(월별/연도별/기간별 상세 요약), 'oldest'(최초 데이터 날짜), 'newest'(최신 날짜), 'specific_date'(특정일 주가) 중 하나
+        start_date: 특정 기간(월, 년도) 조회 시 시작일 (YYYY-MM-DD 형식, 예: '2026-07-01')
+        end_date: 특정 기간 조회 시 종료일 (YYYY-MM-DD 형식, 예: '2026-07-31')
+        target_date: 특정 단일 날짜 조회 시 지정일 (YYYY-MM-DD)
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    where_clause = ""
-    params = []
-    if start_date and end_date:
-        where_clause = "WHERE date BETWEEN ? AND ?"
-        params = [start_date, end_date]
-    elif target_date:
-        where_clause = "WHERE date = ?"
-        params = [target_date]
-        
     try:
-        if intent == 'oldest':
+        # ✨ 특정 달(Month)이나 기간에 대한 종합 요약 생성 로직 추가
+        if intent == 'summary' and start_date and end_date:
+            cursor.execute("SELECT date, open, high, low, close FROM stock_data WHERE date BETWEEN ? AND ? ORDER BY date ASC", (start_date, end_date))
+            rows = cursor.fetchall()
+            if not rows:
+                return f"{start_date} 부터 {end_date} 사이에는 조회 가능한 주가 데이터가 없습니다."
+                
+            prices = [r[4] for r in rows]
+            start_p = prices[0]
+            end_p = prices[-1]
+            max_p = max(prices)
+            min_p = min(prices)
+            avg_p = sum(prices) / len(prices)
+            
+            return (f"[{start_date} ~ {end_date} 주가 요약]\n"
+                    f"- 해당 기간 거래일수: {len(rows)}일\n"
+                    f"- 최고 종가: {int(max_p):,}원\n"
+                    f"- 최저 종가: {int(min_p):,}원\n"
+                    f"- 해당 기간 시초 종가: {int(start_p):,}원 ➔ 해당 기간 마지막 종가: {int(end_p):,}원\n"
+                    f"- 기간 내 평균가: {int(avg_p):,}원\n"
+                    f"- 기간 내 등락률: {round(((end_p - start_p) / start_p) * 100, 2)}%\n"
+                    f"이 데이터를 기반으로 사용자에게 정확한 수치로 표를 그려서 답변하세요.")
+
+        elif intent == 'oldest':
             cursor.execute("SELECT MIN(date) FROM stock_data")
             return f"DB 내 가장 오래된 주가 데이터 날짜: {cursor.fetchone()[0]}"
         elif intent == 'newest':
             cursor.execute("SELECT MAX(date) FROM stock_data")
             return f"DB 내 가장 최신 주가 데이터 날짜: {cursor.fetchone()[0]}"
-        elif intent == 'min':
-            cursor.execute(f"SELECT date, close FROM stock_data {where_clause} ORDER BY close ASC LIMIT 1", params)
+        elif intent == 'specific_date' and target_date:
+            cursor.execute("SELECT date, open, high, low, close, value FROM stock_data WHERE date = ?", (target_date,))
             row = cursor.fetchone()
-            return f"조회된 최저가: {int(row[1]):,}원 (기록일: {row[0]})" if row else "해당 기간에 데이터가 없습니다."
-        elif intent == 'max':
-            cursor.execute(f"SELECT date, close FROM stock_data {where_clause} ORDER BY close DESC LIMIT 1", params)
-            row = cursor.fetchone()
-            return f"조회된 최고가: {int(row[1]):,}원 (기록일: {row[0]})" if row else "해당 기간에 데이터가 없습니다."
-        elif intent == 'average':
-            cursor.execute(f"SELECT AVG(close) FROM stock_data {where_clause}", params)
-            row = cursor.fetchone()
-            return f"해당 기간 평균가: {int(row[0]):,}원" if row and row[0] else "해당 기간에 데이터가 없습니다."
-        elif intent == 'specific_date':
-            cursor.execute(f"SELECT date, open, high, low, close, value FROM stock_data {where_clause}", params)
-            row = cursor.fetchone()
-            return f"{row[0]} 주가 정보 - 시가:{row[1]}, 고가:{row[2]}, 저가:{row[3]}, 종가:{row[4]}" if row else "해당 날짜에 데이터가 없거나 2016년 8월 이전입니다."
+            return f"{row[0]} 주가 정보 - 시가:{row[1]}, 고가:{row[2]}, 저가:{row[3]}, 종가:{row[4]}" if row else "해당 날짜에 데이터가 없습니다."
         else:
-            return "지원하지 않는 intent 입니다."
+            return "조회 실패: 올바른 intent(summary 등)와 날짜 파라미터(start_date, end_date)를 함께 입력해주세요."
     finally:
         conn.close()
 
@@ -256,7 +268,6 @@ def get_stock_data(limit: int = Query(30, description="조회할 데이터 개�
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"데이터 조회 실패: {str(e)}")
 
-# ✨ 보너스 과제: 요약 통계 지표 확장 (기간 수익률, MDD 추가)
 @app.get("/api/data/summary")
 def get_data_summary(limit: int = 100):
     try:
@@ -269,7 +280,6 @@ def get_data_summary(limit: int = 100):
         prices = [item.get("close", item.get("value", 0)) for item in items]
         dates = [item["date"] for item in items]
         
-        # 최신->과거 순서를 과거->최신(연대기) 순으로 변환하여 금융 연산 수행
         chrono_prices = prices[::-1]
         
         max_p = max(prices)
@@ -277,20 +287,16 @@ def get_data_summary(limit: int = 100):
         avg_p = sum(prices) / len(prices)
         volatility = statistics.stdev(prices) if len(prices) > 1 else 0
         
-        # 1. 기간 수익률 계산
         start_price = chrono_prices[0]
         end_price = chrono_prices[-1]
         return_rate = ((end_price - start_price) / start_price) * 100 if start_price else 0
         
-        # 2. MDD(최대 낙폭) 계산
         peak = chrono_prices[0]
         max_drawdown = 0
         for p in chrono_prices:
-            if p > peak:
-                peak = p
+            if p > peak: peak = p
             dd = (p - peak) / peak if peak else 0
-            if dd < max_drawdown:
-                max_drawdown = dd
+            if dd < max_drawdown: max_drawdown = dd
         mdd = max_drawdown * 100
         
         trend = "유지"
@@ -370,12 +376,10 @@ def chat_with_ai(request: ChatRequest):
     try:
         db = get_firestore_client()
         
-        # 1. 최근 1개월(30영업일) 주가 데이터 조회
         all_stock = get_cached_stock_data_with_version()
         stock_items = all_stock[:30]
         
-        # ✨ 보너스 과제: AI에 '원시 데이터' 대신 백엔드에서 미리 연산한 '요약 통계 정보'를 주입
-        context_data = "[미리보기: 최근 1개월 삼성전자 주가 요약 (전체 과거 데이터는 도구 호출 필수)]\n"
+        context_data = "[미리보기: 최근 1개월 삼성전자 주가 요약 (과거의 특정 달이나 연도는 반드시 도구를 호출하여 확인하세요!)]\n"
         
         if stock_items:
             prices = [item.get('close', item.get('value', 0)) for item in stock_items]
@@ -396,17 +400,15 @@ def chat_with_ai(request: ChatRequest):
                 if dd < max_drawdown: max_drawdown = dd
             mdd = max_drawdown * 100
             
-            # AI 프롬프트에 분석된 통계 지표 직접 주입
             context_data += f"- 기준일: {stock_items[-1]['date']} ~ {stock_items[0]['date']}\n"
             context_data += f"- 최근 종가: {end_price:,}원\n"
             context_data += f"- 최고/최저가: {max_p:,}원 / {min_p:,}원 (평균: {int(avg_p):,}원)\n"
             context_data += f"- 기간 수익률: {round(return_rate, 2)}%\n"
             context_data += f"- 최대 낙폭(MDD): {round(mdd, 2)}%\n"
-            context_data += "=> 이 요약 통계를 바탕으로 현재 단기 주가 흐름의 강약 및 리스크를 분석해 주세요.\n"
+            context_data += "=> 이 1개월 요약 통계를 바탕으로 질문에 답하세요.\n"
         else:
             context_data += "주가 데이터를 불러오지 못했습니다.\n"
 
-        # 3. 이전 대화를 불러올 수 있도록 현재 대화방 ID 주입
         current_conv_id = request.conversation_id or "None"
         context_data += f"\n[현재 접속된 대화방 상태]\n- 대화방 ID: {current_conv_id}\n(과거 대화를 조회할 때 이 ID를 파라미터로 사용하세요.)\n"
             

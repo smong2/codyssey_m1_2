@@ -11,7 +11,6 @@
 	--user-msg-bg: #0056b3;
 }
 
-/* 다크 모드 변수 덮어쓰기 */
 body.dark-mode {
 	--bg-color: #121212;
 	--card-bg: #1e1e1e;
@@ -24,13 +23,11 @@ body.dark-mode {
 	--user-msg-bg: #1a365d;
 }
 
-/* 초기화 및 공통 스타일 */
 * {
 	box-sizing: border-box;
 	margin: 0;
 	padding: 0;
 }
-
 body {
 	font-family: "Noto Sans KR", sans-serif;
 	background-color: var(--bg-color);
@@ -38,6 +35,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	height: 100vh;
+	overflow: hidden;
 	transition:
 		background-color 0.3s,
 		color 0.3s;
@@ -45,6 +43,7 @@ body {
 
 /* GNB 영역 */
 .gnb {
+	flex: none;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -52,6 +51,7 @@ body {
 	background-color: var(--card-bg);
 	border-bottom: 1px solid var(--border-color);
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+	z-index: 10;
 }
 .gnb .logo {
 	font-weight: 700;
@@ -72,7 +72,6 @@ body {
 	background-color: var(--hover-color);
 }
 
-/* 레이아웃 뼈대 */
 .app-container {
 	display: flex;
 	flex: 1;
@@ -82,6 +81,7 @@ body {
 /* 사이드바 */
 .sidebar {
 	width: 250px;
+	flex: none;
 	background-color: var(--card-bg);
 	border-right: 1px solid var(--border-color);
 	display: flex;
@@ -98,18 +98,19 @@ body {
 	overflow-y: auto;
 	flex: 1;
 }
+.sidebar.collapsed {
+	display: none;
+}
 
-/* 메인 콘텐츠 */
+/* ✨ 메인 콘텐츠 (좌우 분할 레이아웃) */
 .main-content {
 	flex: 1;
 	display: flex;
-	flex-direction: column;
+	flex-direction: row; /* 데스크탑: 좌우 나란히 배치 */
 	padding: 1.5rem;
 	gap: 1.5rem;
-	overflow-y: auto;
+	overflow: hidden;
 }
-
-/* 카드 컴포넌트 */
 .card {
 	background-color: var(--card-bg);
 	border-radius: 12px;
@@ -120,21 +121,124 @@ body {
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
-/* 대시보드 영역 */
+/* ✨ 대시보드 영역 (좌측, 스크롤 가능) */
 .dashboard {
-	flex: none;
-	height: auto;
+	flex: 1.3;
+	height: 100%;
+	overflow-y: auto;
+	padding-right: 1rem;
+}
+
+/* 탭 전환 UI 스타일 */
+.tabs {
+	display: flex;
+	gap: 1rem;
+	margin-bottom: 1rem;
+}
+.tab-btn {
+	background: none;
+	border: none;
+	font-size: 1.1rem;
+	font-weight: bold;
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0.5rem 0;
+	position: relative;
+	transition: color 0.2s;
+}
+.tab-btn:hover {
+	color: var(--text-main);
+}
+.tab-btn.active {
+	color: var(--primary-color);
+}
+.tab-btn.active::after {
+	content: "";
+	position: absolute;
+	bottom: -5px;
+	left: 0;
+	right: 0;
+	height: 3px;
+	background-color: var(--primary-color);
+	border-radius: 3px;
+}
+
+/* ✨ 뷰(View) 숨김/표시 처리 */
+.view-content {
+	display: none;
+	animation: fadeIn 0.3s;
+}
+.view-content.active {
+	display: block;
+}
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(5px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* 캘린더 및 통계 박스 */
+.filter-btn {
+	padding: 6px 14px;
+	border-radius: 16px;
+	border: 1px solid var(--border-color);
+	background: var(--bg-color);
+	color: var(--text-main);
+	cursor: pointer;
+	transition: background 0.2s;
+}
+.date-input {
+	padding: 6px;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background: var(--bg-color);
+	color: var(--text-main);
+	outline: none;
+}
+.summary-stats-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 1rem;
 }
 .chart-container {
 	position: relative;
-	height: 300px;
+	height: 350px;
 	width: 100%;
 }
 
-/* 🚀 채팅 영역 모던화 */
+/* ✨ 포트폴리오 리스트 높이 제한 (밀림 방지) */
+.portfolio-list-container {
+	max-height: 400px;
+	overflow-y: auto;
+	padding-right: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.8rem;
+}
+.portfolio-content {
+	transition:
+		max-height 0.3s ease,
+		opacity 0.3s ease;
+	max-height: 1200px;
+	opacity: 1;
+	overflow: hidden;
+}
+.portfolio-content.collapsed {
+	max-height: 0;
+	opacity: 0;
+	margin: 0;
+	padding: 0;
+}
+
+/* ✨ 채팅 영역 (우측, 화면 꽉 채움 고정) */
 .chat-section {
-	flex: none;
-	min-height: 500px;
+	flex: 1;
+	height: 100%;
 	display: flex;
 	flex-direction: column;
 }
@@ -146,11 +250,10 @@ body {
 	flex-direction: column;
 	gap: 1.2rem;
 	padding: 1rem;
-	background-color: var(--bg-color); /* 대화창 안쪽 배경 분리 */
+	background-color: var(--bg-color);
 	border-radius: 8px;
 	border: inset 1px var(--border-color);
 }
-
 .message {
 	padding: 1rem 1.2rem;
 	border-radius: 16px;
@@ -160,7 +263,6 @@ body {
 	word-break: break-word;
 	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
-
 .ai-message {
 	background-color: var(--ai-msg-bg);
 	color: var(--text-main);
@@ -168,7 +270,6 @@ body {
 	border-bottom-left-radius: 4px;
 	border: 1px solid var(--border-color);
 }
-
 .user-message {
 	background-color: var(--user-msg-bg);
 	color: white;
@@ -176,7 +277,7 @@ body {
 	border-bottom-right-radius: 4px;
 }
 
-/* ✨ 마크다운 표(Table) 가독성 개선 */
+/* 마크다운 표 디자인 */
 .ai-message table {
 	width: 100%;
 	border-collapse: collapse;
@@ -216,14 +317,11 @@ body.dark-mode .ai-message th {
 	background: var(--bg-color);
 	color: var(--text-main);
 	outline: none;
-	transition: border-color 0.2s;
-}
-.chat-input-area input:focus {
-	border-color: var(--primary-color);
 }
 .chat-input-area button {
 	width: 50px;
 	height: 50px;
+	flex: none;
 	border-radius: 50%;
 	background-color: var(--primary-color);
 	color: white;
@@ -232,50 +330,30 @@ body.dark-mode .ai-message th {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	transition: transform 0.1s;
-}
-.chat-input-area button:active {
-	transform: scale(0.95);
 }
 
-/* ↕️ 접기/펴기 (Collapsible) 클래스 */
-.sidebar.collapsed {
-	display: none;
-}
-.portfolio-content {
-	transition:
-		max-height 0.3s ease,
-		opacity 0.3s ease;
-	max-height: 1000px;
-	opacity: 1;
-	overflow: hidden;
-}
-.portfolio-content.collapsed {
-	max-height: 0;
-	opacity: 0;
-	margin: 0;
-	padding: 0;
-}
-
-/* 📱 모바일 반응형 디자인 */
-@media (max-width: 768px) {
-	.app-container {
+/* 📱 모바일/태블릿 반응형 (위아래 스택) */
+@media (max-width: 1024px) {
+	.main-content {
 		flex-direction: column;
-		height: auto;
+		overflow-y: auto;
 	}
-	.sidebar {
-		width: 100%;
-		border-right: none;
-		border-bottom: 1px solid var(--border-color);
-		max-height: 250px;
-	}
-	.dashboard,
-	.chat-section {
-		width: 100%;
+	.dashboard {
 		height: auto;
 		flex: none;
+		overflow-y: visible;
+		padding-right: 0;
 	}
 	.chat-section {
 		height: 600px;
+		flex: none;
+	}
+	.tabs {
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	#chart-controls {
+		flex-direction: column;
+		align-items: flex-start;
 	}
 }

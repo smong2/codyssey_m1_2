@@ -6,7 +6,6 @@
 let stockChartInstance = null;
 let allStockData = [];
 let currentChartType = "line";
-let currentFilterDays = 20;
 
 document.addEventListener("DOMContentLoaded", () => {
 	fetchAndRenderData();
@@ -14,132 +13,186 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	document.getElementById("btn-add-portfolio").addEventListener("click", addPortfolioItem);
 
+	// 미리 설정된 버튼(1일, 1달 등) 클릭
 	document.querySelectorAll(".filter-btn").forEach((btn) => {
 		btn.addEventListener("click", (e) => {
 			document.querySelectorAll(".filter-btn").forEach((b) => (b.style.backgroundColor = "var(--bg-color)"));
 			e.target.style.backgroundColor = "var(--hover-color)";
 
-			currentFilterDays = parseInt(e.target.dataset.days);
-			applyChartFilter(currentFilterDays);
+			const days = parseInt(e.target.dataset.days);
+			if (allStockData.length === 0) return;
+			const filteredData = allStockData.slice(-days);
+			renderDataView(filteredData);
 		});
+	});
+
+	// ✨ 직접 날짜 조회 버튼 이벤트
+	document.getElementById("btn-custom-date").addEventListener("click", () => {
+		const start = document.getElementById("start-date").value;
+		const end = document.getElementById("end-date").value;
+		if (!start || !end) return alert("시작일과 종료일을 모두 선택해주세요.");
+		if (start > end) return alert("시작일이 종료일보다 클 수 없습니다.");
+
+		// 직접 지정 시 기존 퀵 버튼 하이라이트 제거
+		document.querySelectorAll(".filter-btn").forEach((b) => (b.style.backgroundColor = "var(--bg-color)"));
+
+		// 날짜 구간으로 데이터 필터링 (allStockData는 시간순 배열)
+		const filteredData = allStockData.filter((d) => d.date >= start && d.date <= end);
+		if (filteredData.length === 0) return alert("선택하신 기간에 존재하는 주가 데이터가 없습니다.");
+
+		renderDataView(filteredData);
 	});
 
 	document.getElementById("chart-type").addEventListener("change", (e) => {
 		currentChartType = e.target.value;
-		applyChartFilter(currentFilterDays);
+		// 차트 타입이 바뀌면 현재 활성화된 화면 리렌더링을 위해 버튼 강제클릭
+		document.querySelector(".filter-btn[style*='var(--hover-color)']")?.click() || document.getElementById("btn-custom-date").click();
+	});
+
+	// ✨ 탭(Tab) 전환 버그 완벽 수정 (closest 사용) 및 차트 리사이즈 처리
+	document.querySelectorAll(".tab-btn").forEach((btn) => {
+		btn.addEventListener("click", (e) => {
+			// 버튼 내부의 아이콘을 클릭해도 정확히 버튼 요소를 찾도록 보완
+			const currentBtn = e.target.closest(".tab-btn");
+			if (!currentBtn) return;
+
+			document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+			currentBtn.classList.add("active");
+
+			document.querySelectorAll(".view-content").forEach((v) => v.classList.remove("active"));
+			const targetId = currentBtn.getAttribute("data-target");
+			document.getElementById(targetId).classList.add("active");
+
+			// 차트 탭으로 돌아올 때 캔버스 크기 깨짐 방지
+			if (targetId === "chart-view" && stockChartInstance) {
+				stockChartInstance.resize();
+			}
+		});
 	});
 
 	document.getElementById("btn-toggle-sidebar").addEventListener("click", () => {
-		const sidebar = document.querySelector(".sidebar");
-		sidebar.classList.toggle("collapsed");
+		document.querySelector(".sidebar").classList.toggle("collapsed");
 	});
 
 	document.getElementById("btn-toggle-portfolio").addEventListener("click", () => {
 		const content = document.getElementById("portfolio-content");
 		const icon = document.getElementById("portfolio-icon");
-
 		content.classList.toggle("collapsed");
-		if (content.classList.contains("collapsed")) {
-			icon.classList.replace("fa-chevron-up", "fa-chevron-down");
-		} else {
-			icon.classList.replace("fa-chevron-down", "fa-chevron-up");
-		}
+		icon.classList.replace(content.classList.contains("collapsed") ? "fa-chevron-up" : "fa-chevron-down", content.classList.contains("collapsed") ? "fa-chevron-down" : "fa-chevron-up");
 	});
 
-	// ✨ 보너스 과제: CSV 내보내기 버튼 이벤트 등록 (엑셀 한글 깨짐 방지 BOM 추가)
 	const btnExport = document.getElementById("btn-export");
-	if (btnExport) {
-		btnExport.addEventListener("click", exportToCSV);
-	}
+	if (btnExport) btnExport.addEventListener("click", exportToCSV);
 });
 
 async function fetchAndRenderData() {
 	const summaryContainer = document.getElementById("summary-stats");
-	summaryContainer.innerHTML = '<p style="padding:1rem;"><i class="fa-solid fa-spinner fa-spin"></i> 통계 및 차트를 불러오는 중...</p>';
+	summaryContainer.innerHTML = '<p style="padding:1rem;"><i class="fa-solid fa-spinner fa-spin"></i> 데이터를 불러오는 중...</p>';
 
 	try {
 		const cachedData = sessionStorage.getItem("stockDataCache");
 		if (cachedData) {
 			allStockData = JSON.parse(cachedData);
+			initDatePickers();
 			document.querySelector('.filter-btn[data-days="20"]').style.backgroundColor = "var(--hover-color)";
-			applyChartFilter(currentFilterDays);
+			renderDataView(allStockData.slice(-20));
 			return;
 		}
 
 		const response = await window.API.apiFetch("/api/data?limit=2500");
 		if (response.status === "success" && response.data.length > 0) {
-			allStockData = response.data.reverse();
+			allStockData = response.data.reverse(); // 과거 -> 최신 순 정렬
 			sessionStorage.setItem("stockDataCache", JSON.stringify(allStockData));
-
+			initDatePickers();
 			document.querySelector('.filter-btn[data-days="20"]').style.backgroundColor = "var(--hover-color)";
-			applyChartFilter(currentFilterDays);
+			renderDataView(allStockData.slice(-20));
 		}
 	} catch (error) {
 		summaryContainer.innerHTML = `<p style="color: #ff4d4f;">❌ 로딩 실패: ${error.message}</p>`;
 	}
 }
 
-async function applyChartFilter(days) {
+// 캘린더 입력값의 Min/Max를 실제 DB 보유 기간으로 제한
+function initDatePickers() {
 	if (allStockData.length === 0) return;
+	const oldest = allStockData[0].date;
+	const newest = allStockData[allStockData.length - 1].date;
 
-	const filteredData = allStockData.slice(-days);
-	renderChart(filteredData, currentChartType);
+	const startInput = document.getElementById("start-date");
+	const endInput = document.getElementById("end-date");
 
-	try {
-		const summaryResponse = await window.API.apiFetch(`/api/data/summary?limit=${days}`);
-		if (summaryResponse.status === "success") {
-			const s = summaryResponse.summary;
-			// 상승/하락 색상 동적 지정
-			const returnColor = s.return_rate > 0 ? "#ff4d4f" : s.return_rate < 0 ? "#1890ff" : "var(--text-main)";
-			const currentPrice = s.current_price || s.average; // fallback
-
-			// ✨ 확장된 요약 지표 (수익률, MDD) 화면에 렌더링
-			document.getElementById("summary-stats").innerHTML = `
-                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">조회 기간 (${s.count}일)</div>
-                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">${s.period}</div>
-                </div>
-                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">현재 종가 (기간 평균)</div>
-                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">
-                        ${currentPrice.toLocaleString()}원 <span style="font-size:0.85rem; font-weight:normal; color:var(--text-muted)">(평균 ${s.average.toLocaleString()})</span>
-                    </div>
-                </div>
-                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">기간 수익률 / 최대 낙폭(MDD)</div>
-                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">
-                        <span style="color:${returnColor}">${s.return_rate}%</span> / <span style="color:#1890ff">${s.mdd}%</span>
-                    </div>
-                </div>
-                <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px; border-left: 3px solid #8e44ad;">
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">
-                        최고 / 최저가 (원)
-                    </div>
-                    <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">
-                        <span style="color:#ff4d4f">${s.max.toLocaleString()}</span> <span style="color:var(--text-muted)">/</span> <span style="color:#1890ff">${s.min.toLocaleString()}</span>
-                    </div>
-                </div>
-            `;
-		}
-	} catch (e) {
-		console.error("통계 요약 로딩 실패:", e);
-	}
+	startInput.min = oldest;
+	startInput.max = newest;
+	endInput.min = oldest;
+	endInput.max = newest;
 }
 
-/**
- * ✨ CSV 다운로드 핵심 함수
- */
+// ✨ 차트와 통계 탭을 동시에 갱신 & 캘린더 날짜 톱니바퀴 동기화
+window.currentFilteredData = []; // 내보내기를 위한 전역 임시 저장
+function renderDataView(data) {
+	if (!data || data.length === 0) return;
+	window.currentFilteredData = data;
+
+	// 1. 차트 렌더링
+	renderChart(data, currentChartType);
+
+	// 2. 순수 데이터 기반 요약 통계 프론트엔드 실시간 연산
+	const count = data.length;
+	const startDate = data[0].date;
+	const endDate = data[count - 1].date;
+
+	// ✨ 퀵 버튼(1개월, 1년 등)을 눌렀을 때 캘린더 UI 날짜도 일치하도록 자동 동기화
+	document.getElementById("start-date").value = startDate;
+	document.getElementById("end-date").value = endDate;
+
+	const prices = data.map((d) => d.close || d.value);
+	const startPrice = prices[0];
+	const endPrice = prices[count - 1];
+
+	const maxP = Math.max(...prices);
+	const minP = Math.min(...prices);
+	const avgP = prices.reduce((a, b) => a + b, 0) / count;
+
+	const diff = endPrice - startPrice;
+	const diffRate = (diff / startPrice) * 100;
+	const diffColor = diff > 0 ? "#ff4d4f" : diff < 0 ? "#1890ff" : "var(--text-main)";
+	const diffSign = diff > 0 ? "+" : "";
+
+	document.getElementById("summary-stats").innerHTML = `
+        <div style="padding: 1.2rem; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">조회 기간 (영업일 ${count}일)</div>
+            <div style="font-size: 1.1rem; font-weight: bold; margin-top: 8px;">${startDate} <br>~ ${endDate}</div>
+        </div>
+        <div style="padding: 1.2rem; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">해당 기간 시초가 ➔ 종가</div>
+            <div style="font-size: 1.2rem; font-weight: bold; margin-top: 8px;">
+                ${startPrice.toLocaleString()}원 ➔ ${endPrice.toLocaleString()}원
+            </div>
+        </div>
+        <div style="padding: 1.2rem; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color);">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">기간 내 등락률</div>
+            <div style="font-size: 1.3rem; font-weight: bold; margin-top: 8px; color: ${diffColor};">
+                ${diffSign}${diff.toLocaleString()}원 (${diffSign}${diffRate.toFixed(2)}%)
+            </div>
+        </div>
+        <div style="padding: 1.2rem; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); border-left: 4px solid var(--primary-color);">
+            <div style="font-size: 0.9rem; color: var(--text-muted);">최고 / 최저가 (원)</div>
+            <div style="font-size: 1.2rem; font-weight: bold; margin-top: 8px;">
+                <span style="color:#ff4d4f">${maxP.toLocaleString()}</span> / <span style="color:#1890ff">${minP.toLocaleString()}</span>
+                <div style="font-size:0.85rem; font-weight:normal; color:var(--text-muted); margin-top:4px;">(해당 기간 평균: ${Math.round(avgP).toLocaleString()}원)</div>
+            </div>
+        </div>
+    `;
+}
+
 function exportToCSV() {
-	if (allStockData.length === 0) {
+	if (!window.currentFilteredData || window.currentFilteredData.length === 0) {
 		alert("내보낼 데이터가 없습니다.");
 		return;
 	}
 
-	// 현재 보고 있는 차트 기준 기간의 데이터를 내보냅니다.
-	const filteredData = allStockData.slice(-currentFilterDays);
 	const csvRows = ["날짜,시가,고가,저가,종가,거래량"];
-
-	filteredData.forEach((row) => {
+	window.currentFilteredData.forEach((row) => {
 		const o = row.open || row.value;
 		const h = row.high || row.value;
 		const l = row.low || row.value;
@@ -148,13 +201,11 @@ function exportToCSV() {
 		csvRows.push(`${row.date},${o},${h},${l},${c},${v}`);
 	});
 
-	// 엑셀에서 한글이 깨지지 않도록 BOM(\uFEFF)을 추가하여 Blob 생성
 	const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
 	const url = URL.createObjectURL(blob);
-
 	const link = document.createElement("a");
 	link.setAttribute("href", url);
-	link.setAttribute("download", `samsung_stock_${currentFilterDays}days.csv`);
+	link.setAttribute("download", `samsung_stock_data.csv`);
 	document.body.appendChild(link);
 	link.click();
 	document.body.removeChild(link);
@@ -219,7 +270,6 @@ function renderChart(data, type) {
 	const minPrice = Math.min(...allPrices);
 	const maxPrice = Math.max(...allPrices);
 	const padding = (maxPrice - minPrice) * 0.05;
-
 	const yMin = minPrice === maxPrice ? minPrice * 0.95 : minPrice - padding;
 	const yMax = minPrice === maxPrice ? maxPrice * 1.05 : maxPrice + padding;
 
@@ -246,21 +296,17 @@ function renderChart(data, type) {
 				},
 			},
 			scales: {
-				x: {
-					offset: true,
-					ticks: { color: textColor, maxTicksLimit: 15 },
-					grid: { color: gridColor },
-				},
+				x: { offset: true, ticks: { color: textColor, maxTicksLimit: 15 }, grid: { color: gridColor } },
 				y: {
 					min: yMin,
 					max: yMax,
+					grid: { color: gridColor },
 					ticks: {
 						color: textColor,
 						callback: function (value) {
 							return Math.round(value).toLocaleString() + "원";
 						},
 					},
-					grid: { color: gridColor },
 				},
 			},
 		},
@@ -270,34 +316,26 @@ function renderChart(data, type) {
 async function fetchPortfolio() {
 	const container = document.getElementById("portfolio-list");
 	container.innerHTML = '<div style="padding:1rem; text-align:center;">데이터를 불러오는 중...</div>';
-
 	try {
 		const response = await window.API.apiFetch("/api/portfolio");
-		if (response.status === "success") {
-			renderPortfolio(response.data);
-		}
+		if (response.status === "success") renderPortfolio(response.data);
 	} catch (error) {
 		container.innerHTML = `<div style="padding:1rem; text-align:center; color: #ff4d4f;">❌ 로딩 실패</div>`;
 	}
 }
 
 function renderPortfolio(data) {
-	const container = document.getElementById("portfolio-list");
 	const summaryDiv = document.getElementById("portfolio-summary");
-
 	let totalBuy = 0,
-		totalBuyQty = 0;
-	let totalSell = 0,
+		totalBuyQty = 0,
+		totalSell = 0,
 		totalSellQty = 0;
 
-	container.outerHTML = `<div id="portfolio-list" style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem;"></div>`;
 	const newListContainer = document.getElementById("portfolio-list");
-
 	newListContainer.innerHTML = data
 		.map((item) => {
 			const isBuy = item.trade_type === "buy";
 			const total = item.price * item.quantity;
-
 			if (isBuy) {
 				totalBuy += total;
 				totalBuyQty += item.quantity;
@@ -323,8 +361,7 @@ function renderPortfolio(data) {
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
-            </div>
-        `;
+            </div>`;
 		})
 		.join("");
 
@@ -336,10 +373,7 @@ function renderPortfolio(data) {
 	const realizedProfit = totalSell - totalBuy * (totalSellQty / (totalBuyQty || 1));
 	const profitRate = totalSellQty > 0 ? ((realizedProfit / (totalBuy * (totalSellQty / totalBuyQty))) * 100).toFixed(2) : 0;
 
-	summaryDiv.innerHTML = `
-        현재 보유 수량: <span style="color:var(--primary-color)">${currentHolding}주</span> | 
-        총 매도 수익실현: <span style="color: ${realizedProfit >= 0 ? "#ff4d4f" : "#1890ff"}">${realizedProfit.toLocaleString()}원 (${profitRate}%)</span>
-    `;
+	summaryDiv.innerHTML = `현재 보유 수량: <span style="color:var(--primary-color)">${currentHolding}주</span> | 총 매도 수익실현: <span style="color: ${realizedProfit >= 0 ? "#ff4d4f" : "#1890ff"}">${realizedProfit.toLocaleString()}원 (${profitRate}%)</span>`;
 }
 
 async function addPortfolioItem() {
@@ -348,22 +382,13 @@ async function addPortfolioItem() {
 	const price = document.getElementById("port-price").value;
 	const quantity = document.getElementById("port-qty").value;
 
-	if (!date || !price || !quantity) {
-		alert("날짜, 단가, 수량을 모두 입력해주세요.");
-		return;
-	}
+	if (!date || !price || !quantity) return alert("날짜, 단가, 수량을 모두 입력해주세요.");
 
 	try {
 		const response = await window.API.apiFetch("/api/portfolio", {
 			method: "POST",
-			body: JSON.stringify({
-				trade_type: type,
-				date: date,
-				price: parseFloat(price),
-				quantity: parseInt(quantity, 10),
-			}),
+			body: JSON.stringify({ trade_type: type, date: date, price: parseFloat(price), quantity: parseInt(quantity, 10) }),
 		});
-
 		if (response.status === "success") {
 			document.getElementById("port-date").value = "";
 			document.getElementById("port-price").value = "";
@@ -377,15 +402,9 @@ async function addPortfolioItem() {
 
 async function deletePortfolioItem(id) {
 	if (!confirm("정말 삭제하시겠습니까?")) return;
-
 	try {
-		const response = await window.API.apiFetch(`/api/portfolio/${id}`, {
-			method: "DELETE",
-		});
-
-		if (response.status === "success") {
-			fetchPortfolio();
-		}
+		const response = await window.API.apiFetch(`/api/portfolio/${id}`, { method: "DELETE" });
+		if (response.status === "success") fetchPortfolio();
 	} catch (error) {
 		alert("삭제 실패: " + error.message);
 	}

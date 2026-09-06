@@ -4,15 +4,12 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>삼성전자 AI 투자 비서</title>
-		<!-- 폰트 및 아이콘, 차트 라이브러리 -->
 		<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-		<!-- 커스텀 스타일 -->
 		<link rel="stylesheet" href="css/style.css" />
 	</head>
 	<body>
-		<!-- 1. GNB 영역 -->
 		<header class="gnb">
 			<div class="logo">
 				<button id="btn-toggle-sidebar" class="icon-btn" style="margin-right: 10px" title="채팅 목록 열기/닫기">
@@ -28,47 +25,55 @@
 			</div>
 		</header>
 
-		<!-- 2. 전체 앱 컨테이너 -->
 		<div class="app-container">
-			<!-- 좌측: 대화 기록 사이드바 -->
 			<aside class="sidebar">
 				<div class="sidebar-header">
 					<h3>이전 대화 기록</h3>
 					<button id="btn-new-chat" class="icon-btn"><i class="fa-solid fa-plus"></i></button>
 				</div>
-				<ul id="conversation-list" class="history-list">
-					<!-- JS로 대화 목록 렌더링 -->
-				</ul>
+				<ul id="conversation-list" class="history-list"></ul>
 			</aside>
 
-			<!-- 우측: 메인 콘텐츠 영역 -->
 			<div class="main-content">
-				<!-- 우측 상단: 데이터 대시보드 -->
+				<!-- ✨ 좌측: 대시보드 스크롤 영역 -->
 				<main class="dashboard card">
-					<header class="dashboard-header" style="display: flex; flex-direction: column; gap: 1rem">
+					<header class="dashboard-header" style="display: flex; flex-direction: column; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem">
 						<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem">
-							<h2>📈 주가 데이터 요약 및 차트</h2>
-							<!-- 차트 컨트롤 -->
+							<div class="tabs">
+								<button class="tab-btn active" data-target="chart-view"><i class="fa-solid fa-chart-area"></i> 차트 보기</button>
+								<button class="tab-btn" data-target="summary-view"><i class="fa-solid fa-table"></i> 요약 통계 보기</button>
+							</div>
+
 							<div id="chart-controls" style="display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap">
-								<select id="chart-type" style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main)">
+								<select id="chart-type" style="padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main)">
 									<option value="line">꺾은선 차트</option>
 									<option value="box">박스(캔들) 차트</option>
 								</select>
-								<div id="chart-filters" style="display: flex; gap: 0.5rem">
-									<button class="filter-btn" data-days="1" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1일</button>
-									<button class="filter-btn" data-days="5" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1주</button>
-									<button class="filter-btn" data-days="20" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1개월</button>
-									<button class="filter-btn" data-days="250" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1년</button>
+								<div id="chart-filters" style="display: flex; gap: 0.5rem; align-items: center">
+									<button class="filter-btn" data-days="1">1일</button>
+									<button class="filter-btn" data-days="5">1주</button>
+									<button class="filter-btn" data-days="20">1개월</button>
+									<button class="filter-btn" data-days="250">1년</button>
+
+									<div class="custom-date-filter" style="display: flex; align-items: center; gap: 0.5rem; margin-left: 0.5rem; padding-left: 0.5rem; border-left: 1px solid var(--border-color)">
+										<input type="date" id="start-date" class="date-input" title="시작일" />
+										<span style="color: var(--text-muted)">~</span>
+										<input type="date" id="end-date" class="date-input" title="종료일" />
+										<button id="btn-custom-date" style="padding: 6px 12px; border-radius: 4px; border: none; background: var(--primary-color); color: white; cursor: pointer; font-weight: bold">조회</button>
+									</div>
 								</div>
 							</div>
 						</div>
 					</header>
 
-					<div class="summary-stats" id="summary-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1rem">
-						<!-- JS로 통계 렌더링 -->
+					<div id="chart-view" class="view-content active">
+						<div class="chart-container">
+							<canvas id="stockChart"></canvas>
+						</div>
 					</div>
-					<div class="chart-container">
-						<canvas id="stockChart"></canvas>
+
+					<div id="summary-view" class="view-content">
+						<div class="summary-stats-grid" id="summary-stats"></div>
 					</div>
 
 					<hr style="border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0 1rem 0" />
@@ -78,7 +83,6 @@
 							<i class="fa-solid fa-chevron-up" id="portfolio-icon"></i>
 						</h3>
 
-						<!-- 입력 폼 -->
 						<div id="portfolio-content" class="portfolio-content">
 							<div class="chat-input-area" style="margin-bottom: 1rem">
 								<select id="port-type" style="flex: 0.5; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color)">
@@ -88,34 +92,18 @@
 								<input type="date" id="port-date" style="flex: 1" />
 								<input type="number" id="port-price" placeholder="단가 (원)" style="flex: 1.5" />
 								<input type="number" id="port-qty" placeholder="수량 (주)" style="flex: 1" />
-								<button id="btn-add-portfolio">기록 추가</button>
+								<button id="btn-add-portfolio" style="border-radius: 4px">기록 추가</button>
 							</div>
 
-							<!-- 수익 현황 요약 영역 (테이블 위쪽에 추가) -->
-							<div id="portfolio-summary" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-color); border-radius: 8px; font-weight: bold; color: var(--text-main)">
-								<!-- JS에서 렌더링 (총 수익금, 수익률 등) -->
-							</div>
+							<div id="portfolio-summary" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-color); border-radius: 8px; font-weight: bold; color: var(--text-main)"></div>
 
-							<!-- 데이터 출력 테이블 -->
-							<table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 0.95rem">
-								<thead>
-									<tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted)">
-										<th style="padding: 0.5rem 0">매수일</th>
-										<th>매수 단가</th>
-										<th>수량</th>
-										<th>총 투자금</th>
-										<th>관리</th>
-									</tr>
-								</thead>
-								<tbody id="portfolio-list">
-									<!-- JS로 렌더링 -->
-								</tbody>
-							</table>
+							<!-- 리스트 컨테이너 클래스 지정 -->
+							<div id="portfolio-list" class="portfolio-list-container"></div>
 						</div>
 					</div>
 				</main>
 
-				<!-- 우측 하단: AI 채팅창 -->
+				<!-- ✨ 우측: 채팅창 고정 영역 -->
 				<section class="chat-section card">
 					<div class="chat-messages" id="chat-messages">
 						<div class="message ai-message">안녕하세요! 삼성전자 주가 데이터가 준비되어 있습니다. 무엇을 분석해 드릴까요?</div>
@@ -128,10 +116,8 @@
 			</div>
 		</div>
 
-		<!-- 공통 JS -->
 		<script src="js/api.js"></script>
 		<script src="js/app.js"></script>
-		<!-- 추후 세부 기능 구현 시 주석 해제하여 사용할 파일들 -->
 		<script src="js/data.js"></script>
 		<script src="js/chat.js"></script>
 	</body>
