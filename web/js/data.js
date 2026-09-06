@@ -11,6 +11,7 @@ let currentFilterDays = 20; // 기본 1개월
 document.addEventListener("DOMContentLoaded", () => {
 	fetchAndRenderData();
 	fetchPortfolio();
+
 	document.getElementById("btn-add-portfolio").addEventListener("click", addPortfolioItem);
 
 	// 차트 기간 필터 버튼 이벤트
@@ -29,19 +30,51 @@ document.addEventListener("DOMContentLoaded", () => {
 		currentChartType = e.target.value;
 		applyChartFilter(currentFilterDays); // 타입 변경 시 차트 리렌더링
 	});
+
+	// 사이드바 토글 이벤트
+	document.getElementById("btn-toggle-sidebar").addEventListener("click", () => {
+		const sidebar = document.querySelector(".sidebar");
+		sidebar.classList.toggle("collapsed");
+	});
+
+	// 포트폴리오 접기/펴기 이벤트
+	document.getElementById("btn-toggle-portfolio").addEventListener("click", () => {
+		const content = document.getElementById("portfolio-content");
+		const icon = document.getElementById("portfolio-icon");
+
+		content.classList.toggle("collapsed");
+		if (content.classList.contains("collapsed")) {
+			icon.classList.replace("fa-chevron-up", "fa-chevron-down");
+		} else {
+			icon.classList.replace("fa-chevron-down", "fa-chevron-up");
+		}
+	});
 });
 
 /**
- * 백엔드에서 주가 데이터를 가져와 화면에 렌더링합니다.
+ * 백엔드에서 주가 데이터를 가져와 화면에 렌더링합니다. (세션 캐싱 적용)
  */
 async function fetchAndRenderData() {
 	const summaryContainer = document.getElementById("summary-stats");
 	summaryContainer.innerHTML = '<p style="padding:1rem;"><i class="fa-solid fa-spinner fa-spin"></i> 통계 및 차트를 불러오는 중...</p>';
 
 	try {
+		// 1. 브라우저 세션 스토리지에 캐시된 데이터가 있는지 확인 (F5 새로고침 시 빠른 로딩)
+		const cachedData = sessionStorage.getItem("stockDataCache");
+		if (cachedData) {
+			allStockData = JSON.parse(cachedData);
+			document.querySelector('.filter-btn[data-days="20"]').style.backgroundColor = "var(--hover-color)";
+			applyChartFilter(currentFilterDays);
+			return; // 캐시가 있으면 서버에 요청하지 않고 즉시 종료
+		}
+
+		// 2. 캐시가 없으면 백엔드에 요청 (백엔드 역시 자체 SQLite 캐시에서 초고속으로 반환함)
 		const response = await window.API.apiFetch("/api/data?limit=2500");
 		if (response.status === "success" && response.data.length > 0) {
 			allStockData = response.data.reverse();
+
+			// 브라우저 탭을 닫기 전까지 유지되도록 스토리지에 저장
+			sessionStorage.setItem("stockDataCache", JSON.stringify(allStockData));
 
 			// 초기 렌더링 (1개월 기준)
 			document.querySelector('.filter-btn[data-days="20"]').style.backgroundColor = "var(--hover-color)";
@@ -52,6 +85,9 @@ async function fetchAndRenderData() {
 	}
 }
 
+/**
+ * 선택된 기간에 맞게 차트와 요약 통계를 업데이트합니다.
+ */
 async function applyChartFilter(days) {
 	if (allStockData.length === 0) return;
 
@@ -59,7 +95,7 @@ async function applyChartFilter(days) {
 	const filteredData = allStockData.slice(-days);
 	renderChart(filteredData, currentChartType);
 
-	// ✨ 통계 요약 API 호출 및 렌더링 (보너스 과제)
+	// 통계 요약 API 호출 및 렌더링
 	try {
 		const summaryResponse = await window.API.apiFetch(`/api/data/summary?limit=${days}`);
 		if (summaryResponse.status === "success") {
@@ -83,7 +119,10 @@ async function applyChartFilter(days) {
                     <div style="font-size: 1rem; font-weight: bold; color:#1890ff;">${s.min.toLocaleString()}</div>
                 </div>
                 <div style="padding: 1rem; background: var(--bg-color); border-radius: 8px; border-left: 3px solid #8e44ad;">
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">가격 변동성 (보너스 지표)</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        가격 변동성 
+                        <i class="fa-regular fa-circle-question" title="주가의 흩어짐 정도(표준편차)를 의미합니다. 수치가 클수록 최근 주가의 등락폭이 큼을 나타냅니다." style="cursor:help;"></i>
+                    </div>
                     <div style="font-size: 1rem; font-weight: bold; margin-top: 5px;">±${s.volatility.toLocaleString()}</div>
                 </div>
             `;
@@ -94,89 +133,48 @@ async function applyChartFilter(days) {
 }
 
 /**
- * 데이터 요약 통계를 계산하고 화면에 출력합니다.
- */
-function renderSummary(data) {
-	const container = document.getElementById("summary-stats");
-
-	const count = data.length;
-	const startDate = data[0].date;
-	const endDate = data[count - 1].date;
-
-	// 종가(value) 배열 추출
-	const prices = data.map((item) => item.value);
-	const currentPrice = prices[count - 1];
-	const previousPrice = prices[count - 2] || currentPrice;
-
-	const maxPrice = Math.max(...prices);
-	const minPrice = Math.min(...prices);
-	const avgPrice = (prices.reduce((a, b) => a + b, 0) / count).toFixed(0);
-
-	// 추세 계산
-	const diff = currentPrice - previousPrice;
-	const trendText = diff > 0 ? "▲ 상승" : diff < 0 ? "▼ 하락" : "- 유지";
-	const trendColor = diff > 0 ? "#ff4d4f" : diff < 0 ? "#1890ff" : "var(--text-main)"; // 한국식 붉은색 상승/푸른색 하락
-
-	// 요약 HTML 생성
-	container.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-            <div class="stat-box" style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                <div style="font-size: 0.9rem; color: var(--text-muted);">최근 종가 (${endDate})</div>
-                <div style="font-size: 1.5rem; font-weight: bold; color: ${trendColor};">
-                    ${currentPrice.toLocaleString()}원 <span style="font-size: 1rem;">${trendText}</span>
-                </div>
-            </div>
-            <div class="stat-box" style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                <div style="font-size: 0.9rem; color: var(--text-muted);">조회 기간 (${count}일)</div>
-                <div style="font-size: 1.1rem; font-weight: bold;">${startDate} <br>~ ${endDate}</div>
-            </div>
-            <div class="stat-box" style="padding: 1rem; background: var(--bg-color); border-radius: 8px;">
-                <div style="font-size: 0.9rem; color: var(--text-muted);">최고 / 최저 (원)</div>
-                <div style="font-size: 1.1rem; font-weight: bold; color: #ff4d4f;">${maxPrice.toLocaleString()}</div>
-                <div style="font-size: 1.1rem; font-weight: bold; color: #1890ff;">${minPrice.toLocaleString()}</div>
-            </div>
-        </div>
-    `;
-}
-
-/**
  * Chart.js를 이용해 주가 추세선을 그립니다.
  */
 function renderChart(data, type) {
 	const ctx = document.getElementById("stockChart").getContext("2d");
 	const labels = data.map((item) => item.date);
 
-	// ✨ 다크모드 대응: body에 설정된 --border-color 속성을 읽어와 격자색으로 사용
 	const gridColor = getComputedStyle(document.body).getPropertyValue("--border-color") || "rgba(0,0,0,0.1)";
 	const textColor = getComputedStyle(document.body).getPropertyValue("--text-muted") || "#666";
 
 	let datasets = [];
+	let allPrices = []; // Y축 동적 스케일링을 위한 가격 수집 배열
 
 	if (type === "line") {
+		const lineData = data.map((item) => item.close || item.value);
+		allPrices = [...lineData];
 		datasets = [
 			{
 				type: "line",
 				label: "삼성전자 종가 (원)",
-				data: data.map((item) => item.close || item.value),
+				data: lineData,
 				borderColor: "#0056b3",
 				backgroundColor: "rgba(0, 86, 179, 0.1)",
 				borderWidth: 2,
-				pointRadius: data.length > 50 ? 0 : 3, // 데이터가 많으면 점 숨김
+				pointRadius: data.length === 1 ? 6 : data.length > 50 ? 0 : 3, // 1일 데이터일 경우 점 크기 확대
 				pointHoverRadius: 6,
 				fill: true,
 				tension: 0.4,
 			},
 		];
 	} else {
-		// 박스 차트 (시가-종가)
-		const boxData = data.map((item) => {
-			const o = item.open || item.value;
+		const boxData = data.map((item, index) => {
 			const c = item.close || item.value;
+			let o = item.open;
+			if (o === undefined) o = index > 0 ? data[index - 1].close || data[index - 1].value : c * 0.999;
+			allPrices.push(o, c);
 			return [Math.min(o, c), Math.max(o, c)];
 		});
-		const boxColors = data.map((item) => {
-			const o = item.open || item.value;
+
+		const boxColors = data.map((item, index) => {
 			const c = item.close || item.value;
+			let o = item.open;
+			if (o === undefined) o = index > 0 ? data[index - 1].close || data[index - 1].value : c * 0.999;
 			return c >= o ? "rgba(255, 77, 79, 0.8)" : "rgba(24, 144, 255, 0.8)";
 		});
 
@@ -188,9 +186,19 @@ function renderChart(data, type) {
 				backgroundColor: boxColors,
 				borderWidth: 1,
 				borderColor: boxColors,
+				barPercentage: data.length === 1 ? 0.2 : 0.9, // 1일 데이터일 경우 박스 너비를 얇게 조절
 			},
 		];
 	}
+
+	// Y축 최소/최대값 동적 계산 (상하 5% 여백 추가)
+	const minPrice = Math.min(...allPrices);
+	const maxPrice = Math.max(...allPrices);
+	const padding = (maxPrice - minPrice) * 0.05;
+
+	// 데이터가 1개라서 min과 max가 같을 경우의 예외 처리
+	const yMin = minPrice === maxPrice ? minPrice * 0.95 : minPrice - padding;
+	const yMax = minPrice === maxPrice ? maxPrice * 1.05 : maxPrice + padding;
 
 	if (stockChartInstance) stockChartInstance.destroy();
 
@@ -201,15 +209,36 @@ function renderChart(data, type) {
 			maintainAspectRatio: false,
 			plugins: {
 				legend: { display: true, position: "top", labels: { color: textColor } },
-				tooltip: { mode: "index", intersect: false },
+				tooltip: {
+					mode: "index",
+					intersect: false,
+					callbacks: {
+						label: function (context) {
+							// 툴팁에서 소수점 제거 및 정수 포맷 적용
+							if (Array.isArray(context.raw)) {
+								return `${context.dataset.label}: ${Math.round(context.raw[0]).toLocaleString()}원 ~ ${Math.round(context.raw[1]).toLocaleString()}원`;
+							}
+							return `${context.dataset.label}: ${Math.round(context.raw).toLocaleString()}원`;
+						},
+					},
+				},
 			},
 			scales: {
 				x: {
+					offset: true, // X축 양끝에 여백을 주어 1일 데이터가 정중앙에 오도록 강제
 					ticks: { color: textColor, maxTicksLimit: 15 },
 					grid: { color: gridColor },
 				},
 				y: {
-					ticks: { color: textColor },
+					min: yMin, // 동적 계산된 최저값
+					max: yMax, // 동적 계산된 최고값
+					ticks: {
+						color: textColor,
+						callback: function (value) {
+							// Y축 라벨에서 소수점 제거 및 정수 포맷 적용
+							return Math.round(value).toLocaleString() + "원";
+						},
+					},
 					grid: { color: gridColor },
 				},
 			},
@@ -339,11 +368,3 @@ async function deletePortfolioItem(id) {
 		alert("삭제 실패: " + error.message);
 	}
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-	fetchAndRenderData();
-	fetchPortfolio(); // 추가: 페이지 로드 시 포트폴리오 목록 가져오기
-
-	// 추가: '기록 추가' 버튼 클릭 이벤트 연결
-	document.getElementById("btn-add-portfolio").addEventListener("click", addPortfolioItem);
-});

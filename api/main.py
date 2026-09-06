@@ -1,16 +1,21 @@
+# 1. 파이썬 표준 라이브러리 (Standard Library)
+import json
+import os
+import sqlite3
+import statistics
+from datetime import datetime
+from typing import Literal
+
+# 2. 외부 서드파티 라이브러리 (Third-party Packages)
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import firebase_admin
 from firebase_admin import credentials, firestore
-import os
-import json
-import sqlite3
-from dotenv import load_dotenv
 from pydantic import BaseModel
+
+# 3. 로컬 프로젝트 내부 모듈 (Local Application)
 from api.lib.ai_service import generate_ai_reply
-from datetime import datetime
-from typing import Literal
-import statistics
 
 load_dotenv()
 

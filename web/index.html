@@ -14,7 +14,12 @@
 	<body>
 		<!-- 1. GNB 영역 -->
 		<header class="gnb">
-			<div class="logo"><i class="fa-solid fa-chart-line"></i> 삼성전자 AI 투자 비서</div>
+			<div class="logo">
+				<button id="btn-toggle-sidebar" class="icon-btn" style="margin-right: 10px" title="채팅 목록 열기/닫기">
+					<i class="fa-solid fa-bars"></i>
+				</button>
+				<i class="fa-solid fa-chart-line"></i> 삼성전자 AI 투자 비서
+			</div>
 			<div class="gnb-controls">
 				<button id="btn-export" class="icon-btn" title="데이터 CSV 내보내기"><i class="fa-solid fa-download"></i> 내보내기</button>
 				<button id="btn-theme" class="icon-btn" title="다크모드 토글">
@@ -50,10 +55,10 @@
 									<option value="box">박스(캔들) 차트</option>
 								</select>
 								<div id="chart-filters" style="display: flex; gap: 0.5rem">
-									<button class="filter-btn" data-days="1" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1일</button>
-									<button class="filter-btn" data-days="5" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1주</button>
-									<button class="filter-btn" data-days="20" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1개월</button>
-									<button class="filter-btn" data-days="250" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); cursor: pointer">1년</button>
+									<button class="filter-btn" data-days="1" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1일</button>
+									<button class="filter-btn" data-days="5" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1주</button>
+									<button class="filter-btn" data-days="20" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1개월</button>
+									<button class="filter-btn" data-days="250" style="padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); cursor: pointer">1년</button>
 								</div>
 							</div>
 						</div>
@@ -68,40 +73,45 @@
 
 					<hr style="border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0 1rem 0" />
 					<div class="portfolio-section">
-						<h3 style="margin-bottom: 1rem">💼 나의 가상 투자 기록</h3>
+						<h3 id="btn-toggle-portfolio" style="margin-bottom: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; color: var(--text-main)">
+							<span>💼 나의 가상 투자 기록</span>
+							<i class="fa-solid fa-chevron-up" id="portfolio-icon"></i>
+						</h3>
 
 						<!-- 입력 폼 -->
-						<div class="chat-input-area" style="margin-bottom: 1rem">
-							<select id="port-type" style="flex: 0.5; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color)">
-								<option value="buy">매수</option>
-								<option value="sell">매도</option>
-							</select>
-							<input type="date" id="port-date" style="flex: 1" />
-							<input type="number" id="port-price" placeholder="단가 (원)" style="flex: 1.5" />
-							<input type="number" id="port-qty" placeholder="수량 (주)" style="flex: 1" />
-							<button id="btn-add-portfolio">기록 추가</button>
-						</div>
+						<div id="portfolio-content" class="portfolio-content">
+							<div class="chat-input-area" style="margin-bottom: 1rem">
+								<select id="port-type" style="flex: 0.5; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color)">
+									<option value="buy">매수</option>
+									<option value="sell">매도</option>
+								</select>
+								<input type="date" id="port-date" style="flex: 1" />
+								<input type="number" id="port-price" placeholder="단가 (원)" style="flex: 1.5" />
+								<input type="number" id="port-qty" placeholder="수량 (주)" style="flex: 1" />
+								<button id="btn-add-portfolio">기록 추가</button>
+							</div>
 
-						<!-- 수익 현황 요약 영역 (테이블 위쪽에 추가) -->
-						<div id="portfolio-summary" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-color); border-radius: 8px; font-weight: bold; color: var(--text-main)">
-							<!-- JS에서 렌더링 (총 수익금, 수익률 등) -->
-						</div>
+							<!-- 수익 현황 요약 영역 (테이블 위쪽에 추가) -->
+							<div id="portfolio-summary" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-color); border-radius: 8px; font-weight: bold; color: var(--text-main)">
+								<!-- JS에서 렌더링 (총 수익금, 수익률 등) -->
+							</div>
 
-						<!-- 데이터 출력 테이블 -->
-						<table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 0.95rem">
-							<thead>
-								<tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted)">
-									<th style="padding: 0.5rem 0">매수일</th>
-									<th>매수 단가</th>
-									<th>수량</th>
-									<th>총 투자금</th>
-									<th>관리</th>
-								</tr>
-							</thead>
-							<tbody id="portfolio-list">
-								<!-- JS로 렌더링 -->
-							</tbody>
-						</table>
+							<!-- 데이터 출력 테이블 -->
+							<table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 0.95rem">
+								<thead>
+									<tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted)">
+										<th style="padding: 0.5rem 0">매수일</th>
+										<th>매수 단가</th>
+										<th>수량</th>
+										<th>총 투자금</th>
+										<th>관리</th>
+									</tr>
+								</thead>
+								<tbody id="portfolio-list">
+									<!-- JS로 렌더링 -->
+								</tbody>
+							</table>
+						</div>
 					</div>
 				</main>
 

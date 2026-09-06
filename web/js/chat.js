@@ -160,6 +160,8 @@ async function loadConversationDetail(convId) {
 			messages.forEach((msg) => {
 				appendMessage(msg.role, msg.content);
 			});
+			// 대화 내역을 모두 렌더링한 후 스크롤을 최하단으로 강제 이동
+			scrollToBottom();
 		}
 	} catch (error) {
 		chatContainer.innerHTML = `<div class="message ai-message">❌ 대화 내역을 불러오지 못했습니다.</div>`;
@@ -177,9 +179,12 @@ function startNewChat() {
             안녕하세요! 새로운 대화를 시작합니다. 무엇을 분석해 드릴까요?
         </div>
     `;
+	scrollToBottom();
+	// 활성화된 채팅방 배경색 초기화를 위해 목록 새로고침
+	loadConversationList();
 }
 
-// --- 아래 UI 관련 공통 함수 (appendMessage, appendLoading, removeLoading)는 기존과 동일합니다 ---
+// --- 아래 UI 관련 공통 함수 (appendMessage, appendLoading, removeLoading) ---
 function appendMessage(sender, text) {
 	const chatContainer = document.getElementById("chat-messages");
 	const msgDiv = document.createElement("div");
@@ -188,7 +193,9 @@ function appendMessage(sender, text) {
 	// 줄바꿈 문자를 <br>로 변환하여 출력
 	msgDiv.innerHTML = text.replace(/\n/g, "<br>");
 	chatContainer.appendChild(msgDiv);
-	chatContainer.scrollTop = chatContainer.scrollHeight;
+
+	// 메시지가 추가될 때마다 확실하게 스크롤 하단 이동 보장
+	scrollToBottom();
 }
 
 let loadingInterval;
@@ -206,13 +213,13 @@ function appendLoading() {
 
 	// 즉시 첫 문구 렌더링
 	loadingDiv.innerHTML = `<i class="fa-solid fa-ellipsis fa-fade"></i> ${loadingPhrases[phraseIndex]}`;
-	chatContainer.scrollTop = chatContainer.scrollHeight;
+	scrollToBottom();
 
 	// 1.5초마다 문구 변경 및 스크롤 고정
 	loadingInterval = setInterval(() => {
 		phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
 		loadingDiv.innerHTML = `<i class="fa-solid fa-ellipsis fa-fade"></i> ${loadingPhrases[phraseIndex]}`;
-		chatContainer.scrollTop = chatContainer.scrollHeight;
+		scrollToBottom();
 	}, 1500);
 
 	return id;
@@ -224,9 +231,18 @@ function removeLoading(id) {
 	if (loadingDiv) loadingDiv.remove();
 }
 
+/**
+ * 렌더링 타이밍을 고려하여 확실하게 스크롤을 최하단으로 내리는 함수
+ */
 function scrollToBottom() {
 	const chatContainer = document.getElementById("chat-messages");
+	if (!chatContainer) return;
+
+	// setTimeout을 통해 DOM이 완전히 업데이트된 후 높이를 재계산하여 스크롤
 	setTimeout(() => {
-		chatContainer.scrollTop = chatContainer.scrollHeight;
+		chatContainer.scrollTo({
+			top: chatContainer.scrollHeight,
+			behavior: "smooth",
+		});
 	}, 50);
 }
