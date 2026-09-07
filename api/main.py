@@ -145,41 +145,48 @@ def get_cached_stock_data_with_version():
 
 def query_stock_data(intent: str, start_date: str = None, end_date: str = None, target_date: str = None) -> str:
     """
-    SQLite DB에서 과거 주가 데이터를 조회합니다. (존재 기간: 2016년 8월 ~ 현재)
-    사용자가 과거의 특정 연도, 특정 월(예: 2026년 7월), 특정 일자의 데이터를 물어보면 반드시 이 도구를 호출하세요.
+    [주가 데이터 전용 조회 도구]
+    삼성전자의 2016년 8월부터 현재까지의 모든 과거 주가 데이터(종가, 시가, 고가, 저가, 거래량 등)를 조회합니다.
+    사용자가 과거의 특정 시점이나 기간에 대해 질문하면 절대 거절하지 말고 이 도구를 호출하세요.
     
     Args:
-        intent: 'summary'(월별/연도별/기간별 상세 요약), 'oldest'(최초 데이터 날짜), 'newest'(최신 날짜), 'specific_date'(특정일 주가) 중 하나
-        start_date: 특정 기간(월, 년도) 조회 시 시작일 (YYYY-MM-DD 형식, 예: '2026-07-01')
-        end_date: 특정 기간 조회 시 종료일 (YYYY-MM-DD 형식, 예: '2026-07-31')
-        target_date: 특정 단일 날짜 조회 시 지정일 (YYYY-MM-DD)
+        intent: 다음 중 하나를 반드시 선택하세요.
+                - 'summary' (특정 연도, 특정 월, 특정 기간의 전체 요약이 필요할 때. start_date와 end_date 필수)
+                - 'specific_date' (특정 단일 날짜의 주가를 물어볼 때. target_date 필수)
+                - 'oldest' (가장 오래된 데이터 시점 조회)
+                - 'newest' (가장 최근 데이터 시점 조회)
+        start_date: 기간 조회 시 시작일 (형식: YYYY-MM-DD, 예: '2026-07-01')
+        end_date: 기간 조회 시 종료일 (형식: YYYY-MM-DD, 예: '2026-07-31')
+        target_date: 단일 날짜 조회 시 (형식: YYYY-MM-DD)
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        # ✨ 특정 달(Month)이나 기간에 대한 종합 요약 생성 로직 추가
         if intent == 'summary' and start_date and end_date:
-            cursor.execute("SELECT date, open, high, low, close FROM stock_data WHERE date BETWEEN ? AND ? ORDER BY date ASC", (start_date, end_date))
+            cursor.execute("SELECT date, open, high, low, close, value FROM stock_data WHERE date BETWEEN ? AND ? ORDER BY date ASC", (start_date, end_date))
             rows = cursor.fetchall()
             if not rows:
                 return f"{start_date} 부터 {end_date} 사이에는 조회 가능한 주가 데이터가 없습니다."
                 
-            prices = [r[4] for r in rows]
+            prices = [r[4] or r[5] for r in rows]
+            highs = [r[2] or r[5] for r in rows]
+            lows = [r[3] or r[5] for r in rows]
+            
             start_p = prices[0]
             end_p = prices[-1]
-            max_p = max(prices)
-            min_p = min(prices)
+            max_p = max(highs)
+            min_p = min(lows)
             avg_p = sum(prices) / len(prices)
             
-            return (f"[{start_date} ~ {end_date} 주가 요약]\n"
+            return (f"[{start_date} ~ {end_date} 실제 주가 요약 (팩트 데이터)]\n"
                     f"- 해당 기간 거래일수: {len(rows)}일\n"
-                    f"- 최고 종가: {int(max_p):,}원\n"
-                    f"- 최저 종가: {int(min_p):,}원\n"
-                    f"- 해당 기간 시초 종가: {int(start_p):,}원 ➔ 해당 기간 마지막 종가: {int(end_p):,}원\n"
-                    f"- 기간 내 평균가: {int(avg_p):,}원\n"
+                    f"- 해당 기간 최고가(High): {int(max_p):,}원\n"
+                    f"- 해당 기간 최저가(Low): {int(min_p):,}원\n"
+                    f"- 기간 시초 종가: {int(start_p):,}원 ➔ 기간 마지막 종가: {int(end_p):,}원\n"
+                    f"- 기간 내 평균 종가: {int(avg_p):,}원\n"
                     f"- 기간 내 등락률: {round(((end_p - start_p) / start_p) * 100, 2)}%\n"
-                    f"이 데이터를 기반으로 사용자에게 정확한 수치로 표를 그려서 답변하세요.")
+                    f"이 데이터를 기반으로 사용자에게 정확한 팩트로 답변하세요.")
 
         elif intent == 'oldest':
             cursor.execute("SELECT MIN(date) FROM stock_data")
@@ -190,13 +197,19 @@ def query_stock_data(intent: str, start_date: str = None, end_date: str = None, 
         elif intent == 'specific_date' and target_date:
             cursor.execute("SELECT date, open, high, low, close, value FROM stock_data WHERE date = ?", (target_date,))
             row = cursor.fetchone()
-            return f"{row[0]} 주가 정보 - 시가:{row[1]}, 고가:{row[2]}, 저가:{row[3]}, 종가:{row[4]}" if row else "해당 날짜에 데이터가 없습니다."
+            if row:
+                return f"{row[0]} 주가 정보 - 시가:{row[1]}, 고가:{row[2]}, 저가:{row[3]}, 종가:{row[4]}"
+            return f"해당 날짜({target_date})는 휴장일이거나 데이터가 존재하지 않습니다."
         else:
-            return "조회 실패: 올바른 intent(summary 등)와 날짜 파라미터(start_date, end_date)를 함께 입력해주세요."
+            return "조회 실패: 올바른 intent 파라미터(summary 등)와 날짜(YYYY-MM-DD)를 입력해주세요."
     finally:
         conn.close()
 
 def analyze_portfolio() -> str:
+    """
+    [포트폴리오 전용 조회 도구]
+    사용자의 가상 투자 내역(매수/매도), 현재 보유 수량, 총 투자금, 실현 수익금, 수익률 등을 물어볼 때 무조건 호출하세요.
+    """
     db = get_firestore_client()
     docs = db.collection("portfolio").order_by("date").stream()
     
@@ -227,6 +240,10 @@ def analyze_portfolio() -> str:
 - 확정(실현) 수익금: {int(realized_profit):,}원"""
 
 def get_conversation_history(conversation_id: str) -> str:
+    """
+    [과거 대화 기록 전용 조회 도구]
+    사용자가 "아까 내가 뭐라고 했지?", "방금 물어본 내용" 등 이전 대화의 맥락(Context)을 물어볼 때 무조건 호출하세요.
+    """
     if not conversation_id or conversation_id == "None":
         return "현재 대화방은 새로 시작되었으므로 이전 대화 기록이 존재하지 않습니다."
         

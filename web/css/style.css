@@ -334,9 +334,22 @@ body.dark-mode .ai-message th {
 
 /* 📱 모바일/태블릿 반응형 (위아래 스택) */
 @media (max-width: 1024px) {
-	.main-content {
+	.app-container {
 		flex-direction: column;
 		overflow-y: auto;
+	}
+	.sidebar {
+		width: 100%;
+		border-right: none;
+		border-bottom: 1px solid var(--border-color);
+		max-height: 200px;
+		flex: none;
+	}
+
+	.main-content {
+		flex-direction: column;
+		overflow-y: visible;
+		padding: 1rem;
 	}
 	.dashboard {
 		height: auto;
@@ -344,10 +357,14 @@ body.dark-mode .ai-message th {
 		overflow-y: visible;
 		padding-right: 0;
 	}
+
+	/* 모바일에서 채팅창은 하단에 고정된 느낌을 주도록 최소 높이 확보 */
 	.chat-section {
 		height: 600px;
 		flex: none;
+		margin-top: 1rem;
 	}
+
 	.tabs {
 		flex-direction: column;
 		gap: 0.5rem;
@@ -355,5 +372,12 @@ body.dark-mode .ai-message th {
 	#chart-controls {
 		flex-direction: column;
 		align-items: flex-start;
+	}
+	.custom-date-filter {
+		margin-left: 0;
+		padding-left: 0;
+		border-left: none;
+		margin-top: 0.5rem;
+		width: 100%;
 	}
 }
