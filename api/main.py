@@ -510,6 +510,83 @@ def get_stock_data(limit: int = Query(30, description="조회할 데이터 개�
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"데이터 조회 실패: {str(e)}")
 
+class DataItem(BaseModel):
+    date: str
+    value: float
+    memo: str = ""
+
+@app.post("/api/data", summary="새 분석 데이터 추가")
+def add_data(item: DataItem):
+    try:
+        db = get_firestore_client()
+        doc_data = {
+            "date": item.date,
+            "value": item.value,
+            "close": item.value,
+            "memo": item.memo,
+            "open": item.value,
+            "high": item.value,
+            "low": item.value,
+            "created_at": datetime.now().isoformat()
+        }
+        _, doc_ref = db.collection("stock_data").add(doc_data)
+        try:
+            db.collection("metadata").document("stock_status").set(
+                {"version": firestore.Increment(1)}, merge=True
+            )
+        except Exception:
+            pass
+        return {"status": "success", "message": "데이터가 성공적으로 추가되었습니다.", "id": doc_ref.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"데이터 추가 실패: {str(e)}")
+
+@app.put("/api/data/{doc_id}", summary="기존 분석 데이터 수정")
+def update_data(doc_id: str, item: DataItem):
+    try:
+        db = get_firestore_client()
+        doc_ref = db.collection("stock_data").document(doc_id)
+        if not doc_ref.get().exists:
+            raise HTTPException(status_code=404, detail="해당 데이터를 찾을 수 없습니다.")
+        update_dict = {
+            "date": item.date,
+            "value": item.value,
+            "close": item.value,
+            "memo": item.memo,
+            "updated_at": datetime.now().isoformat()
+        }
+        doc_ref.set(update_dict, merge=True)
+        try:
+            db.collection("metadata").document("stock_status").set(
+                {"version": firestore.Increment(1)}, merge=True
+            )
+        except Exception:
+            pass
+        return {"status": "success", "message": "데이터가 성공적으로 수정되었습니다."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"데이터 수정 실패: {str(e)}")
+
+@app.delete("/api/data/{doc_id}", summary="기존 분석 데이터 삭제")
+def delete_data(doc_id: str):
+    try:
+        db = get_firestore_client()
+        doc_ref = db.collection("stock_data").document(doc_id)
+        if not doc_ref.get().exists:
+            raise HTTPException(status_code=404, detail="해당 데이터를 찾을 수 없습니다.")
+        doc_ref.delete()
+        try:
+            db.collection("metadata").document("stock_status").set(
+                {"version": firestore.Increment(1)}, merge=True
+            )
+        except Exception:
+            pass
+        return {"status": "success", "message": "데이터가 성공적으로 삭제되었습니다."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"데이터 삭제 실패: {str(e)}")
+
 @app.get("/api/data/summary")
 def get_data_summary(limit: int = 100):
     try:
@@ -663,6 +740,24 @@ def chat_with_ai(request: ChatRequest):
         return {"status": "success", "reply": reply, "conversation_id": conv_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class ConversationCreate(BaseModel):
+    title: str = "새 대화"
+    messages: list = []
+
+@app.post("/api/conversations", summary="새 대화 세션 저장")
+def create_conversation(data: ConversationCreate):
+    try:
+        db = get_firestore_client()
+        timestamp = datetime.now().isoformat()
+        _, doc_ref = db.collection("conversations").add({
+            "title": data.title,
+            "updated_at": timestamp,
+            "messages": data.messages
+        })
+        return {"status": "success", "message": "대화가 성공적으로 저장되었습니다.", "id": doc_ref.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"대화 저장 실패: {str(e)}")
 
 @app.get("/api/conversations")
 def get_conversation_list():

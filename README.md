@@ -1,130 +1,214 @@
-# codyssey_m1_2
-
-# AI Agent 개발: 나만의 AI 비서 구축
-
 # 🚀 삼성전자 AI 투자 비서 (Samsung Stock Insight Agent)
 
-본 서비스는 삼성전자의 10년치 주가 데이터를 바탕으로 사용자의 투자를 돕는 AI 비서입니다. 일반적인 AI가 모르는 과거 통계 데이터와 사용자의 가상 투자 기록을 결합하여 맞춤형 인사이트를 제공합니다.
+> **Codyssey M1-2 AI Agent 개발 과제**  
+> 삼성전자의 10년치 일별 시계열 주가 데이터와 사용자의 가상 투자 기록(포트폴리오)을 결합하여, 맞춤형 투자 인사이트와 정밀한 분석을 제공하는 풀스택 AI 비서 서비스입니다.
 
-## 🌟 주요 기능
+---
 
-1. **데이터 기반 AI 채팅**: 10년치 통계 요약을 바탕으로 주가 흐름 및 미래 시나리오 예측 (AI Function Calling 적용)
-2. **가상 투자 포트폴리오 (CRUD)**: 과거 특정 시점의 매수/매도 기록을 관리하고 현재 수익률 확인
-3. **실시간 데이터 요약 및 시각화**: 현재 주가 위치, 최근 추세, 변동성 등 핵심 지표 자동 계산 및 Chart.js 기반 주가 추세선 시각화 제공
-4. **대화 기록 저장**: AI와의 이전 대화 내용을 언제든 다시 불러오기
-5. **UX 고도화 (보너스)**: 다크 모드 토글 지원, 주가 데이터 CSV 내보내기 기능 제공
+## 🌟 서비스 소개 (Overview)
 
-## 🤖 AI 도구 호출 (Function Calling) 및 멀티채널 연동 (보너스 과제)
+일반적인 범용 LLM은 기업의 내부 데이터나 개인의 포트폴리오 상태를 알지 못해 "삼성전자 이번 달 수익률이 어때?", "2023년 주가 흐름은 어땠어?"와 같은 질문에 두루뭉술한 답변만 제공합니다.
 
-본 프로젝트는 LLM의 한계를 극복하고 효율적인 데이터 처리를 위해 Function Calling과 MCP(Model Context Protocol) 기반 아키텍처를 도입했습니다.
+본 서비스는 **2016년부터 2026년까지의 삼성전자 10년치 일별 주가 데이터(2,445건)**와 사용자의 **가상 매수/매도 기록**을 바탕으로:
+1. **데이터 요약 기반 컨텍스트 주입(Context Injection)**과
+2. **3대 전용 도구(Function Calling)**를 결합하여,
 
-### 1. 어떤 근거로 어떤 도구를 호출했는가? (Rationale)
+최근 1개월 단기 흐름뿐만 아니라 과거 10년치 특정 날짜/기간의 팩트 데이터를 정확하게 탐색하고 실시간 포트폴리오 수익률을 분석하여 맞춤형 답변을 제공합니다.
 
-- **`get_stock_summary(days)` 도구**
-  - **호출 근거:** LLM에게 10년치 일일 주가 데이터(약 2,500건)를 통째로 프롬프트에 주입하는 것은 심각한 토큰 낭비와 문맥 유실(Lost in the Middle)을 유발합니다. 따라서 사용자가 특정 기간의 주가(최고가, 최저가, 평균 등)를 묻는 경우, 백엔드의 SQLite 캐시를 통해 계산된 정확한 통계 요약값만 동적으로 호출하여 할당량 초과를 방지하고 답변의 정확도를 극대화했습니다.
-- **`get_portfolio_status()` 도구**
-  - **호출 근거:** 사용자의 실시간 가상 매수/매도 기록과 현재 주가를 비교하여 정확한 수익률을 계산하기 위해, 필요 시 AI가 직접 사용자의 최신 포트폴리오 데이터를 조회하도록 구성했습니다.
+---
+
+## 📋 주요 기능
+
+| 기능 영역 | 상세 설명 |
+| :--- | :--- |
+| **1. 데이터 기반 AI 채팅** | • 시스템 프롬프트에 최근 1개월 요약 지표 자동 주입<br>• 질문 성격에 따라 3대 도구(주가 DB, 포트폴리오, 대화 기록) 자동 호출<br>• 수치 데이터 마크다운 표(`\|---\|`) 렌더링 및 로딩 애니메이션 |
+| **2. 데이터 관리 (CRUD)** | • **데이터 API**: `(date, value, memo)` 표준 CRUD (`POST/GET/PUT/DELETE /api/data`)<br>• **가상 포트폴리오 CRUD**: 매수/매도 유형, 날짜, 단가, 수량 실시간 등록/삭제/목록 갱신 |
+| **3. 시계열 데이터 시각화** | • Chart.js 기반 **꺾은선(Line) 차트** 및 **박스(캔들스틱) 차트** 지원<br>• 기간 퀵 필터(1일, 1주, 1개월, 1년) 및 **사용자 지정 캘린더 날짜 검색**<br>• 기간 내 시초가, 종가, 등락률, 최고/최저/평균가 실시간 연산 |
+| **4. 대화 기록 저장 및 복원** | • 모든 질의응답 Firestore `conversations` 자동 저장<br>• 사이드바에서 이전 대화 목록 조회 및 클릭 시 대화 내용 복원<br>• 대화 세션 인라인 제목 수정(`PUT`) 및 삭제(`DELETE`) 지원 |
+| **5. UX 및 인사이트 고도화** | • 라이트 / 다크 모드 토글 (LocalStorage 영구 저장)<br>• 조회 중인 주가 데이터 **CSV 파일 즉시 내보내기**<br>• SQLite 2계층 캐시를 통한 Firestore 읽기 비용 및 응답 속도 최적화 |
+
+---
+
+## 🤖 AI 도구 호출 (Function Calling) 및 호출 흐름
+
+대용량 10년치 주가 데이터(약 2,500건)를 프롬프트에 통째로 주입하면 심각한 토큰 낭비와 문맥 유실(Lost in the Middle)이 발생합니다. 이를 해결하기 위해 백엔드에 3가지 전용 도구를 구현하고 Gemini가 필요 시 동적으로 호출하도록 구성했습니다.
+
+### 1. 도구별 호출 근거 (Rationale)
+
+- **`query_stock_data(query_type, start_date, end_date, target_date)`**
+  - **호출 근거**: 사용자가 과거 데이터, 이전 데이터, 특정 연도/월(예: "2023년 주가"), 특정일(예: "2024년 5월 10일 종가"), 역대 최고가/최저가를 질문할 때 호출합니다. 로컬 SQLite 캐시 DB를 직접 질의하여 정확한 수치와 날짜를 반환하며, 주말/공휴일 휴장일인 경우 직전 거래일 데이터를 자동으로 탐색해 안내합니다.
+- **`analyze_portfolio()`**
+  - **호출 근거**: 사용자가 본인의 가상 투자 내역, 보유 주식 수량, 평단가, 실현 손익 및 현재 수익률을 질문할 때 호출합니다. Firestore의 매수/매도 기록과 로컬 SQLite의 최신 종가를 실시간으로 대조하여 **미실현 평가 손익 및 평가 수익률(%)**을 자동 계산해 반환합니다.
+- **`get_conversation_history(conversation_id)`**
+  - **호출 근거**: "아까 내가 뭐라고 했지?", "방금 물어본 내용" 등 이전 대화 맥락을 질문할 때 호출합니다. 현재 세션의 과거 대화 메시지를 복원하여 일관성 있는 맥락을 제공합니다.
 
 ### 2. 호출 흐름 다이어그램 (Invocation Flow)
 
-이 시스템은 외부 채널(MCP Client)에서도 동일하게 도구를 호출할 수 있도록 설계되어 멀티채널 연동을 지원합니다.
-
 ```text
-[사용자 / 외부 채널 (MCP Client)]
-       │ (1) 질문: "10년 내 최저가는 얼마야?"
+[사용자 화면 (웹 UI)]
+       │ (1) 질문 입력: "2024년 5월 10일 주가 얼마였어?"
+       ▼
+[FastAPI 백엔드 (/api/chat)]
+       │ (2) 최근 1개월 기초 컨텍스트 + 도구 스키마(3종) 전달
        ▼
 [Gemini AI 모델]
-       │ (2) 판단: 내부 지식 및 단기 데이터로 답변 불가 ➔ Tool Call 요청
+       │ (3) 판단: 기본 컨텍스트 범위 외의 특정일 질의 ➔ 도구 호출 결정
+       │     Tool Call: query_stock_data(query_type="exact_date", target_date="2024-05-10")
        ▼
-[FastAPI 백엔드 (MCP Server 연동)]
-       │ (3) 실행: SQLite 쿼리 연산 (SELECT MIN(close) ...) 수행
+[FastAPI 도구 실행 엔진]
+       │ (4) SQLite DB 질의: SELECT * FROM stock_data WHERE date = '2024-05-10'
        ▼
-[SQLite 로컬 캐시 DB]
-       │ (4) 결과 반환: 최저가 및 해당 날짜 데이터
+[로컬 SQLite DB (stock_cache.db)]
+       │ (5) 팩트 데이터 반환: 종가 75,991원 (시가/고가/저가 포함)
        ▼
 [Gemini AI 모델]
-       │ (5) 데이터 기반 자연어 답변 합성
+       │ (6) 반환된 팩트 데이터를 바탕으로 마크다운 표(|---|) 및 인사이트 자연어 답변 합성
        ▼
-[사용자 화면]
+[사용자 화면 (웹 UI)]
+       (7) 마크다운 표 렌더링 및 답변 표시
 ```
 
-## 🛠 기술 스택
+---
 
-- **Frontend**: Vanilla JavaScript, HTML5, CSS3 (Tailwind-like Custom CSS), Chart.js
-- **Backend**: FastAPI, Pydantic, yfinance, Firebase Admin SDK, SQLite (캐싱)
-- **AI/LLM**: Google Gemini API (Context Injection & Function Calling 적용)
-- **Database**: Google Firebase Firestore, 로컬 SQLite
-- **Infrastructure & Deployment**: Docker, Render (API), Vercel (Web)
+## 🛠 기술 스택 (Tech Stack)
+
+| 계층 | 기술 | 사용 목적 및 라이브러리 |
+| :--- | :--- | :--- |
+| **Frontend** | Vanilla JS (ES6+), HTML5, CSS3 | 프레임워크 없는 순수 웹 표준, 반응형 레이아웃, 다크 모드 CSS 변수 |
+| **Data Visualization** | Chart.js, FontAwesome | 주가 시계열 꺾은선/박스 차트 렌더링, UI 아이콘 |
+| **Backend** | Python 3.10+, FastAPI, Uvicorn | 고성능 비동기 REST API 서버, 자동 Swagger UI 문서화 |
+| **Data Validation** | Pydantic v1/v2 | API 요청/응답 스키마 엄격 검증 (`DataItem`, `PortfolioItem`, `ChatRequest` 등) |
+| **Database** | Firebase Firestore, SQLite3 | Firestore(영구 저장 및 클라우드 동기화), SQLite(로컬 2계층 고속 캐싱 DB) |
+| **AI / LLM** | Google Gemini API (`google-generativeai`) | Context Injection, Automatic Function Calling, 낮은 온도(0.1) 환각 억제 |
+| **Data Collection** | yfinance, Pandas | 삼성전자(`005930.KS`) 10년치 OHLCV 시계열 데이터 자동 수집 |
+| **DevOps & Deploy** | Docker, Docker Compose, Render, Vercel | 컨테이너화 개발 환경, Backend(Render) 및 Frontend(Vercel) 배포 |
+
+---
+
+## 📡 API 엔드포인트 명세
+
+Swagger UI (`/docs`)를 통해 대화형 API 테스트가 가능합니다.
+
+### 1. 데이터 API (Data CRUD & Summary)
+- `GET /api/data` : 분석 데이터 목록 조회 (query: `limit`)
+- `POST /api/data` : 새 분석 데이터 추가 (`date`, `value`, `memo`)
+- `PUT /api/data/{doc_id}` : 기존 분석 데이터 수정
+- `DELETE /api/data/{doc_id}` : 분석 데이터 삭제
+- `GET /api/data/summary` : 시스템 프롬프트 주입용 통계 요약 (최고/최저/평균, 최근 트렌드, 변동성, MDD)
+
+### 2. 가상 투자 포트폴리오 API (Portfolio)
+- `GET /api/portfolio` : 사용자 가상 투자 내역 전체 조회
+- `POST /api/portfolio` : 매수/매도 기록 추가 (`trade_type`, `date`, `price`, `quantity`)
+- `DELETE /api/portfolio/{doc_id}` : 특정 가상 투자 기록 삭제
+
+### 3. 대화 세션 API (Conversations)
+- `GET /api/conversations` : 대화 세션 목록 조회 (최근 수정순)
+- `POST /api/conversations` : 새 대화 세션 수동 저장
+- `GET /api/conversations/{conv_id}` : 특정 대화 세션의 전체 메시지 히스토리 조회
+- `PUT /api/conversations/{conv_id}` : 대화 세션 제목 수정
+- `DELETE /api/conversations/{conv_id}` : 대화 세션 삭제
+
+### 4. AI 챗봇 API (AI Chat)
+- `POST /api/chat` : 자연어 질문 전달 $\rightarrow$ 데이터 요약 주입 $\rightarrow$ Function Calling 수행 $\rightarrow$ 대화 내역 Firestore 자동 저장 및 응답 반환
+
+---
 
 ## 🔗 배포 URL
 
-- **Frontend (Vercel)**: [Vercel 배포 주소 입력]
-- **Backend API (Render)**: [Render 배포 주소 입력]
-- **API Documentation (Swagger)**: [Render 배포 주소]/docs
+- **Frontend (Vercel)**: `https://codyssey-m1-2.vercel.app` *(배포 주소 입력)*
+- **Backend API (Render)**: `https://codyssey-m1-2.onrender.com` *(배포 주소 입력)*
+- **API Documentation (Swagger UI)**: `https://codyssey-m1-2.onrender.com/docs`
 
-## 📁 프로젝트 구조
+> **Note (Render 콜드스타트 안내)**: Render 무료 티어는 15분간 비활성 시 슬립 모드로 진입합니다. 첫 API 호출 시 약 30~50초의 지연이 발생할 수 있으며, 프론트엔드에 로딩 인디케이터가 적용되어 있습니다.
+
+---
+
+## 📁 프로젝트 디렉토리 구조
 
 ```text
-my_ai_assistant/
-├── docker/
-│   ├── docker-compose.yml
-│   └── Dockerfile          # 단일 도커파일 (로컬 및 Render 배포용)
-├── web/                    # [Vercel 배포 타겟] 프론트엔드 UI 영역
-│   ├── index.html          # 메인 뷰 (채팅, 차트, 데이터 관리)
+codyssey_m1_2/
+├── api/                             # FastAPI 백엔드 영역
+│   ├── lib/
+│   │   ├── ai_service.py            # Gemini 연동, 시스템 프롬프트, 도구 호출 제어
+│   │   └── collect_data.py          # yfinance 주가 수집 및 Firestore 업로드/버전 관리
+│   ├── main.py                      # FastAPI 엔드포인트, 도구 정의, SQLite 캐시 연동
+│   ├── stock_cache.db               # 10년치 주가 데이터 SQLite 로컬 캐시 (2,445건)
+│   ├── serviceAccountKey.json       # Firebase Admin SDK 서비스 계정 인증 키
+│   ├── .env                         # 로컬 환경 변수 파일
+│   └── .env_sample                  # 환경 변수 템플릿 파일
+├── docker/                          # Docker 인프라 설정
+│   ├── Dockerfile                   # FastAPI 백엔드 이미지 빌드 명세
+│   └── docker-compose.yml           # Backend(8090) 및 Frontend(3000) 동시 구동
+├── web/                             # 바닐라 프론트엔드 UI 영역
 │   ├── css/
-│   │   └── style.css       # 커스텀 CSS & 다크모드
-│   └── js/
-│       ├── api.js          # 백엔드 통신 모듈 (fetch)
-│       ├── app.js          # 공통 UI 및 초기화 로직
-│       ├── data.js         # 데이터 CRUD 및 차트 렌더링
-│       └── chat.js         # 채팅 UI 로직
-├── api/                    # [Render 배포 타겟] FastAPI 백엔드 영역
-│   ├── main.py             # FastAPI 진입점 및 라우팅 설정
-│   ├── lib/                # 비즈니스 로직 라이브러리
-│   │   ├── collect_data.py # 주가 데이터 수집기
-│   │   ├── database.py     # Firestore CRUD 로직
-│   │   └── ai_service.py   # AI Function Calling 로직
-│   ├── .env                # 로컬 환경 변수
-│   ├── .env_sample
-│   └── serviceAccountKey.json
-├── start.sh
-└── README.md
+│   │   └── style.css                # CSS 커스텀 변수 기반 테마(다크모드) 및 반응형 레이아웃
+│   ├── js/
+│   │   ├── api.js                   # 공통 fetch 래퍼 모듈
+│   │   ├── app.js                   # 다크모드 토글 및 전역 UI 컨트롤러
+│   │   ├── data.js                  # 주가/포트폴리오 조회, Chart.js 렌더링, CSV 내보내기
+│   │   └── chat.js                  # 실시간 AI 채팅 인터랙션, 마크다운 표 렌더러, 세션 관리
+│   └── index.html                   # 메인 대시보드 및 채팅 통합 뷰
+├── start.sh                         # 원클릭 Docker 빌드 및 구동 스크립트
+├── README.md                        # 프로젝트 설명서 및 실행 가이드
+├── add_report.md                    # 요구사항 대비 완성도 분석 및 심층 기술 보고서
+└── topic.md                         # 초기 기획 배경 및 요구사항 정의서
 ```
 
-## ⚙️ 로컬 실행 방법 (Docker 기반)
+---
 
-본 프로젝트는 Docker를 활용하여 로컬 개발 환경과 배포 환경의 일관성을 유지합니다.
+## ⚙️ 로컬 실행 방법
 
-1. **저장소 클론**
+본 프로젝트는 Docker 및 Docker Compose를 통해 종속성 설치 없이 즉시 실행할 수 있습니다.
 
-   ```bash
-   git clone https://github.com/smong2/codyssy_m1_2.git
-   cd codyssy_m1_2
-   ```
+### 1. 저장소 클론 및 환경 변수 설정
 
-2. **환경 변수 및 키 설정**
-   - `api/.env_sample` 파일을 복사하여 `api/.env` 파일을 생성합니다.
-   - Firebase 서비스 계정 키(`serviceAccountKey.json`)를 `api/` 디렉토리 내에 위치시킵니다.
-   - `start.sh` 를 실행해서 docker 환경을 활성화합니다. (실행이 되지 않으면 실행권한을 부여해야 함)
+```bash
+git clone https://github.com/smong2/codyssey_m1_2.git
+cd codyssey_m1_2
 
-   **📋 환경 변수 목록 (`api/.env`)**
-   - `GEMINI_API_KEY`: Google Gemini API 인증 키
-   - `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase 서비스 계정 키 (JSON 문자열 또는 경로)
-   - `API_BASE_URL`: 프론트엔드에서 참조할 백엔드 주소 (로컬 구동 시 `http://localhost:8090`)
-   - `ALLOWED_ORIGINS`: CORS 허용 도메인 목록 (예: `http://localhost:3000, https://[Vercel주소].vercel.app`)
+# 1) 환경 변수 파일 복사
+cp api/.env_sample api/.env
 
-3. **Docker Compose 실행** 최상위 디렉토리(root)에서 아래 명령어를 실행하여 컨테이너를 빌드하고 실행합니다.
+# 2) api/.env 파일에 실제 API 키 입력
+# GEMINI_API_KEY=your_gemini_api_key
+# FIREBASE_SERVICE_ACCOUNT_JSON=api/serviceAccountKey.json
 
-   ```bash
-   start.sh (실행가능이 아닌 경우 실행권한을 주고 실행합니다)
-   ```
+# 3) Firebase 서비스 계정 키 파일 위치 확인
+# api/serviceAccountKey.json 파일 배치
+```
 
-4. **서비스 접속**
-   - **Frontend UI**: `http://localhost:3000`
-   - **Backend API Docs (Swagger)**: `http://localhost:8090/docs`
+**📋 필수 환경 변수 목록 (`api/.env`)**
+- `GEMINI_API_KEY`: Google Gemini API 키
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase 서비스 계정 키 파일 경로 또는 JSON 문자열
+- `API_BASE_URL`: 프론트엔드에서 참조할 백엔드 주소 (로컬: `http://localhost:8090`)
+- `ALLOWED_ORIGINS`: CORS 허용 도메인 목록 (기본: `*` 또는 로컬/배포 URL)
 
-## 📸 실행 스크린샷
+### 2. 서비스 구동 (`start.sh`)
 
-- **데이터 요약 및 채팅 화면** (Chart.js 시각화 및 다크모드 적용 모습 포함)
-- **투자 기록 관리(CRUD) 화면** (데이터 추가/수정/삭제 및 내보내기 버튼 동작 확인)
-- **대화 내역 불러오기 화면**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+또는 Docker Compose 직접 실행:
+```bash
+docker compose -f docker/docker-compose.yml up --build -d
+```
+
+### 3. 로컬 접속 URL
+- **Frontend UI**: `http://localhost:3000`
+- **Backend Swagger UI**: `http://localhost:8090/docs`
+- **Backend Health Check**: `http://localhost:8090/`
+
+---
+
+## 📸 제출 스크린샷 안내
+
+과제 제출에 필요한 필수 3대 화면 캡처 영역입니다:
+
+1. **데이터 요약이 보이는 채팅 화면 (질문+답변 포함)**
+   - 대시보드 상단 요약 통계와 함께 우측 채팅창에서 과거 주가(예: "2024년 5월 10일 종가는?") 또는 포트폴리오 질문에 AI가 팩트 데이터 마크다운 표로 답변한 화면
+2. **데이터 관리 화면 (CRUD 동작 확인)**
+   - "💼 나의 가상 투자 기록" 섹션에서 매수/매도 내역을 추가하고, 포트폴리오 목록에 단가/수량/평가손익이 갱신되어 삭제 아이콘이 표시된 화면
+3. **대화 기록 화면 (불러오기 동작 확인)**
+   - 좌측 사이드바의 "이전 대화 기록" 목록에서 과거 대화방을 클릭하여 이전 질문과 답변 메시지가 채팅창에 재표시된 화면
