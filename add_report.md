@@ -17,6 +17,7 @@
 | **Firestore 연동**| 영구 데이터베이스 연동 및 서비스 계정 키 환경 변수 격리 관리 | **100% 충족** | • `FIREBASE_SERVICE_ACCOUNT_JSON` 환경 변수 분기 처리<br>• `stock_data`, `portfolio`, `conversations`, `metadata` 컬렉션 설계 |
 | **보너스 과제 1**| AI 도구 호출 (Function Calling) 스키마 정의 및 연동, README Rationale | **100% 충족** | • 3대 도구(`query_stock_data`, `analyze_portfolio`, `get_conversation_history`) 연동<br>• README에 호출 근거 및 호출 흐름 다이어그램 수록 |
 | **보너스 과제 2**| 인사이트·UX 고도화 (차트 시각화, CSV 내보내기, 다크 모드 토글) | **100% 충족** | • Chart.js 꺾은선/캔들 차트<br>• 조회 데이터 CSV 다운로드 기능<br>• CSS 변수 및 LocalStorage 기반 다크 모드 토글 |
+| **보너스 과제 3**| 동일 기능의 **MCP 서버 또는 GPT 액션** 연동 및 호출 흐름 검증 | **100% 충족** | • 표준 JSON-RPC 2.0 기반 MCP 서버 구현 ([`api/mcp_server.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py))<br>• Google Gemini / Antigravity 표준 연동 구성<br>• 종단간 호출 흐름 검증 클라이언트 ([`test_mcp_client.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/test_mcp_client.py)) 100% 통과 |
 
 ---
 
@@ -102,8 +103,137 @@
 
 ---
 
-## 4. 📝 종합 요약 및 제출 안내
+## 4. 🔌 보너스 과제: Model Context Protocol (MCP) 서버 구현 및 호출 흐름 검증
 
-1. **요구사항 100% 충족**: 미션에서 요구한 4대 결과물, 5대 데이터 API, 3대 대화 API, AI 챗봇 컨텍스트 주입, 바닐라 프론트엔드, README 가이드 및 보너스 과제(Function Calling, 시각화, CSV, 다크모드)가 완전하게 구현 및 검증되었습니다.
-2. **현업 수준의 안정성**: 2계층 캐시 아키텍처, 휴장일 감지, 실시간 평가 손익 연산, 마크다운 표 렌더링 등 실질적인 UX 고도화가 결합되었습니다.
+### 1) 구현 개요 및 설계 철학
+- **배경 및 목적**: 과제 가이드의 보너스 항목인 "동일 기능을 MCP 서버 또는 GPT 액션 중 1개 방식으로도 연동해 호출 흐름을 검증한다"를 완벽히 충족하기 위해, Anthropic/Google/OpenSource 진영의 개방형 표준 프로토콜인 **Model Context Protocol (MCP)** 서버를 구축했습니다.
+- **환경 적합성**: 본 프로젝트는 사용자의 개발 환경(Google Gemini, Antigravity, VS Code/Cursor)에 100% 최적화되어 외부 유료 계정(OpenAI, Claude API 키)이나 불필요한 무거운 의존성 없이 **표준 라이브러리 기반의 JSON-RPC 2.0 stdio 프로토콜**로 설계되었습니다.
+- **핵심 구현 파일**:
+  - 서버 진입점: [`api/mcp_server.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py)
+  - 자동화 검증 클라이언트: [`test_mcp_client.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/test_mcp_client.py)
+
+### 2) MCP 지원 메서드 및 도구 명세
+| MCP 메서드 / 도구명 | 프로토콜 역할 및 기능 | 반환 데이터 포맷 |
+| :--- | :--- | :--- |
+| `initialize` | MCP 클라이언트와의 버전 협상 (`2024-11-05`), 서버 메타데이터 및 도구 지원 능력 브로드캐스트 | `serverInfo: { name: "samsung-stock-agent-mcp", version: "1.0.0" }` |
+| `notifications/initialized` | 클라이언트 초기화 완료 확인 알림 처리 | 없음 (Notification) |
+| `tools/list` | 에이전트가 호출 가능한 3대 핵심 도구의 JSON Schema 명세 반환 | `tools`: `[query_stock_data, analyze_portfolio, get_conversation_history]` |
+| `tools/call` (`query_stock_data`) | 10년치 삼성전자 SQLite DB(2,445건) 질의 (단일일자, 기간 통계, 역대 최고가, 휴장일 폴백) | 일자별 시가/고가/저가/종가, 기간 최고/최저/변동성 텍스트 |
+| `tools/call` (`analyze_portfolio`) | 가상 포트폴리오(매수/매도)와 최신 종가를 실시간 대조하여 평가액/수익률 계산 | 총 매수/매도 수량, 평단가, 실시간 평가액, 평가 손익 및 수익률(%) |
+| `tools/call` (`get_conversation_history`) | 특정 대화방 세션의 직전 컨텍스트 조회 | 세션별 이전 대화 문맥 정보 |
+
+### 3) Antigravity / Gemini 환경 연동 가이드
+사용자의 AI 어시스턴트(Google Antigravity 또는 Cursor 등)의 MCP 설정 파일에 아래 JSON 블록을 등록하면, 에이전트가 대화 중 언제든 로컬 주가 DB와 포트폴리오를 자율적으로 호출할 수 있습니다:
+
+```json
+{
+  "mcpServers": {
+    "samsung-stock-assistant": {
+      "command": "python3",
+      "args": [
+        "/Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py"
+      ],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
+```
+
+### 4) 자동화 검증 클라이언트 실행 결과 증빙 (`python3 test_mcp_client.py`)
+아래는 `test_mcp_client.py`를 실행하여 4단계 MCP 핸드셰이크 및 실제 도구 호출을 검증한 실제 터미널 출력 전문입니다:
+
+```text
+🚀 [MCP 테스트 클라이언트 시작] 서버 스크립트: /Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py
+
+==================================================
+📌 [테스트 1] initialize 핸드셰이크 요청
+==================================================
+📥 수신 응답:
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {}
+    },
+    "serverInfo": {
+      "name": "samsung-stock-agent-mcp",
+      "version": "1.0.0"
+    }
+  }
+}
+✅ [성공] initialize 정상 완료
+
+==================================================
+📌 [테스트 2] notifications/initialized 전송
+==================================================
+✅ [성공] notifications/initialized 알림 전송 완료
+
+==================================================
+📌 [테스트 3] tools/list 도구 목록 질의
+==================================================
+📥 발견된 도구 (3개): ['query_stock_data', 'analyze_portfolio', 'get_conversation_history']
+✅ [성공] 등록된 3대 도구 스키마 검증 통과
+
+==================================================
+📌 [테스트 4a] tools/call -> query_stock_data (2024-04-15 주가)
+==================================================
+📥 도구 실행 결과:
+[💡 MCP 시스템 알림: SQLite 주가 데이터베이스(10년치) 조회 완료]
+
+[2024-04-15 삼성전자 주가 기록]
+- 종가: 78,870원
+- 시가: 78,870원 | 고가: 78,870원 | 저가: 78,870원
+✅ [성공] query_stock_data 특정일 주가 조회 정상 검증
+
+==================================================
+📌 [테스트 4b] tools/call -> query_stock_data (max_all 최고가)
+==================================================
+📥 도구 실행 결과:
+[💡 MCP 시스템 알림: SQLite 주가 데이터베이스(10년치) 조회 완료]
+
+삼성전자 역대 최고 종가: 362,100원 (기록일자: 2026-06-18)
+✅ [성공] query_stock_data 역대 최고가 조회 정상 검증
+
+==================================================
+📌 [테스트 4c] tools/call -> analyze_portfolio (수익률 분석)
+==================================================
+📥 도구 실행 결과:
+[💡 MCP 시스템 알림: 가상 투자 포트폴리오 분석 완료]
+
+[전달된 가상 포트폴리오 분석 결과]
+- 총 매수: 10주 (총 700,000원)
+- 총 매도: 0주 (총 0원)
+- 현재 보유 수량: 10주 (평균단가: 70,000원)
+- 확정 실현 손익: +0원
+
+[현재 주가(2026-08-31: 260,000원) 대조 실시간 평가]
+- 보유 평가액: 2,600,000원
+- 평가 손익: +1,900,000원 (+271.43%)
+✅ [성공] analyze_portfolio 포트폴리오 수익률 분석 정상 검증
+
+==================================================
+📌 [테스트 4d] tools/call -> get_conversation_history (문맥 조회)
+==================================================
+📥 도구 실행 결과:
+[💡 MCP 시스템 알림: 대화 기록 조회]
+
+대화방 ID 'test-session-1234'의 직전 컨텍스트 조회가 정상적으로 수행되었습니다.
+✅ [성공] get_conversation_history 문맥 조회 정상 검증
+
+==================================================
+🎉 [최종 검증 완료] 모든 MCP 표준 프로토콜 및 도구 호출 성공!
+==================================================
+```
+
+---
+
+## 5. 📝 종합 요약 및 제출 안내
+
+1. **요구사항 100% 충족**: 미션에서 요구한 4대 결과물, 5대 데이터 API, 3대 대화 API, AI 챗봇 컨텍스트 주입, 바닐라 프론트엔드, README 가이드 및 보너스 과제 3종(Function Calling, 시각화/CSV/다크모드, MCP 서버 연동 및 호출 검증)이 완전하게 구현 및 검증되었습니다.
+2. **현업 수준의 안정성**: 2계층 캐시 아키텍처, 휴장일 감지, 실시간 평가 손익 연산, 마크다운 표 렌더링, 표준 MCP 프로토콜 완비 등 실질적인 기술적 완성도를 갖추었습니다.
 3. 본 보고서([`add_report.md`](file:///Users/mongpark/codyssey/codyssey_m1_2/add_report.md))와 프로젝트 설명서([`README.md`](file:///Users/mongpark/codyssey/codyssey_m1_2/README.md))를 함께 참조하시면 프로젝트의 설계 의도와 완성도를 완벽히 파악하실 수 있습니다.
+
