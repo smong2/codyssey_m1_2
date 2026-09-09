@@ -52,16 +52,26 @@ def get_firestore_client():
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 default_key_path = os.path.join(base_dir, "serviceAccountKey.json")
                 key_path = firebase_env if firebase_env else default_key_path
-                cred = credentials.Certificate(key_path)
-                firebase_admin.initialize_app(cred)
+                if os.path.exists(key_path):
+                    cred = credentials.Certificate(key_path)
+                else:
+                    return None
+            firebase_admin.initialize_app(cred)
         except Exception as e:
-            print(f"❌ Firebase 초기화 오류: {e}")
-    return firestore.client()
+            print(f"⚠️ Firebase 초기화 경고: {e}")
+            return None
+    try:
+        return firestore.client()
+    except Exception:
+        return None
 
 # ==========================================
 # 🚀 SQLite 캐싱 로직 (Firestore 읽기 최적화)
 # ==========================================
-DB_PATH = "api/stock_cache.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "stock_cache.db")
+if not os.path.exists(DB_PATH):
+    DB_PATH = os.path.join(os.getcwd(), "api", "stock_cache.db")
 
 def init_sqlite_db():
     os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else ".", exist_ok=True)
@@ -93,10 +103,14 @@ init_sqlite_db()
 
 def get_cached_stock_data_with_version():
     db = get_firestore_client()
-    
-    meta_doc = db.collection("metadata").document("stock_status").get()
-    remote_version = str(meta_doc.to_dict().get("version", 1)) if meta_doc.exists else "1"
-    
+    remote_version = None
+    if db is not None:
+        try:
+            meta_doc = db.collection("metadata").document("stock_status").get()
+            remote_version = str(meta_doc.to_dict().get("version", 1)) if meta_doc.exists else "1"
+        except Exception as e:
+            print(f"⚠️ Firestore 메타데이터 조회 경고: {e}")
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT value FROM meta WHERE key = 'version'")
@@ -106,7 +120,8 @@ def get_cached_stock_data_with_version():
     cursor.execute("SELECT COUNT(*) FROM stock_data")
     count = cursor.fetchone()[0]
     
-    if local_version == remote_version and count > 0:
+    # 로컬 캐시가 존재하고 버전이 일치하거나, Firestore 연결이 없는 경우 로컬 SQLite 데이터 즉시 반환
+    if count > 0 and (db is None or remote_version is None or local_version == remote_version):
         cursor.execute("SELECT date, open, high, low, close, value FROM stock_data ORDER BY date DESC")
         rows = cursor.fetchall()
         conn.close()
@@ -118,31 +133,50 @@ def get_cached_stock_data_with_version():
             } for r in rows
         ]
     
-    docs = db.collection("stock_data").order_by("date", direction=firestore.Query.DESCENDING).limit(2500).stream()
-    items = []
-    
-    cursor.execute("DELETE FROM stock_data")
-    
-    for doc in docs:
-        data = doc.to_dict()
-        items.append(data)
-        cursor.execute("""
-            INSERT OR REPLACE INTO stock_data (date, open, high, low, close, value)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            data.get("date"),
-            data.get("open", data.get("value")),
-            data.get("high", data.get("value")),
-            data.get("low", data.get("value")),
-            data.get("close", data.get("value")),
-            data.get("value", 0)
-        ))
-        
-    cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('version', ?)", (remote_version,))
-    conn.commit()
+    # Firestore에서 새로운 데이터를 가져와 SQLite에 동기화
+    if db is not None:
+        try:
+            docs = db.collection("stock_data").order_by("date", direction=firestore.Query.DESCENDING).limit(2500).stream()
+            items = []
+            
+            cursor.execute("DELETE FROM stock_data")
+            
+            for doc in docs:
+                data = doc.to_dict()
+                items.append(data)
+                cursor.execute("""
+                    INSERT OR REPLACE INTO stock_data (date, open, high, low, close, value)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    data.get("date"),
+                    data.get("open", data.get("value")),
+                    data.get("high", data.get("value")),
+                    data.get("low", data.get("value")),
+                    data.get("close", data.get("value")),
+                    data.get("value", 0)
+                ))
+                
+            cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('version', ?)", (remote_version or "1",))
+            conn.commit()
+            conn.close()
+            return items
+        except Exception as e:
+            print(f"⚠️ Firestore stock_data 동기화 실패 (로컬 캐시 사용): {e}")
+
+    # Firestore 동기화 실패 시 로컬 캐시 폴백
+    if count > 0:
+        cursor.execute("SELECT date, open, high, low, close, value FROM stock_data ORDER BY date DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "date": r[0], "open": r[1], "high": r[2], 
+                "low": r[3], "close": r[4], "value": r[5]
+            } for r in rows
+        ]
+
     conn.close()
-    
-    return items
+    return []
 
 def parse_flexible_date(date_str: str) -> str:
     """
@@ -649,19 +683,26 @@ class PortfolioItem(BaseModel):
 def get_portfolio():
     try:
         db = get_firestore_client()
+        if db is None:
+            return {"status": "success", "data": []}
         docs = db.collection("portfolio").order_by("date", direction=firestore.Query.ASCENDING).stream()
         results = [{"id": doc.id, **doc.to_dict()} for doc in docs]
         return {"status": "success", "data": results}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"⚠️ get_portfolio 오류: {e}")
+        return {"status": "success", "data": []}
 
 @app.post("/api/portfolio")
 def add_portfolio(item: PortfolioItem):
     try:
         db = get_firestore_client()
+        if db is None:
+            raise HTTPException(status_code=503, detail="Firebase 데이터베이스가 구성되지 않았습니다.")
         doc_ref = db.collection("portfolio").document()
         doc_ref.set(item.dict())
         return {"status": "success", "message": "추가되었습니다.", "id": doc_ref.id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -669,8 +710,12 @@ def add_portfolio(item: PortfolioItem):
 def delete_portfolio(doc_id: str):
     try:
         db = get_firestore_client()
+        if db is None:
+            raise HTTPException(status_code=503, detail="Firebase 데이터베이스가 구성되지 않았습니다.")
         db.collection("portfolio").document(doc_id).delete()
         return {"status": "success", "message": "삭제되었습니다."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -722,22 +767,29 @@ def chat_with_ai(request: ChatRequest):
         reply = generate_ai_reply(request.message, context_data, tools=ai_tools)
         
         timestamp = datetime.now().isoformat()
-        if request.conversation_id:
-            conv_ref = db.collection("conversations").document(request.conversation_id)
-            conv_ref.update({
-                "updated_at": timestamp,
-                "messages": firestore.ArrayUnion([{"role": "user", "content": request.message}, {"role": "ai", "content": reply}])
-            })
-            conv_id = request.conversation_id
-        else:
-            title = request.message[:15] + "..." if len(request.message) > 15 else request.message
-            _, doc_ref = db.collection("conversations").add({
-                "title": title, "updated_at": timestamp,
-                "messages": [{"role": "user", "content": request.message}, {"role": "ai", "content": reply}]
-            })
-            conv_id = doc_ref.id
+        conv_id = request.conversation_id or f"session-{int(datetime.now().timestamp())}"
+        if db is not None:
+            try:
+                if request.conversation_id:
+                    conv_ref = db.collection("conversations").document(request.conversation_id)
+                    conv_ref.update({
+                        "updated_at": timestamp,
+                        "messages": firestore.ArrayUnion([{"role": "user", "content": request.message}, {"role": "ai", "content": reply}])
+                    })
+                    conv_id = request.conversation_id
+                else:
+                    title = request.message[:15] + "..." if len(request.message) > 15 else request.message
+                    _, doc_ref = db.collection("conversations").add({
+                        "title": title, "updated_at": timestamp,
+                        "messages": [{"role": "user", "content": request.message}, {"role": "ai", "content": reply}]
+                    })
+                    conv_id = doc_ref.id
+            except Exception as e:
+                print(f"⚠️ 대화 Firestore 저장 실패: {e}")
             
         return {"status": "success", "reply": reply, "conversation_id": conv_id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -749,6 +801,8 @@ class ConversationCreate(BaseModel):
 def create_conversation(data: ConversationCreate):
     try:
         db = get_firestore_client()
+        if db is None:
+            raise HTTPException(status_code=503, detail="Firebase 데이터베이스가 구성되지 않았습니다.")
         timestamp = datetime.now().isoformat()
         _, doc_ref = db.collection("conversations").add({
             "title": data.title,
@@ -756,6 +810,8 @@ def create_conversation(data: ConversationCreate):
             "messages": data.messages
         })
         return {"status": "success", "message": "대화가 성공적으로 저장되었습니다.", "id": doc_ref.id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"대화 저장 실패: {str(e)}")
 
@@ -763,20 +819,27 @@ def create_conversation(data: ConversationCreate):
 def get_conversation_list():
     try:
         db = get_firestore_client()
+        if db is None:
+            return {"status": "success", "data": []}
         docs = db.collection("conversations").order_by("updated_at", direction=firestore.Query.DESCENDING).stream()
         results = [{"id": doc.id, "title": doc.to_dict().get("title", "새 대화")} for doc in docs]
         return {"status": "success", "data": results}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"⚠️ get_conversation_list 오류: {e}")
+        return {"status": "success", "data": []}
 
 @app.get("/api/conversations/{conv_id}")
 def get_conversation_detail(conv_id: str):
     try:
         db = get_firestore_client()
+        if db is None:
+            raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
         doc = db.collection("conversations").document(conv_id).get()
         if doc.exists:
             return {"status": "success", "data": doc.to_dict()}
         raise HTTPException(status_code=404, detail="대화를 찾을 수 없습니다.")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -784,8 +847,12 @@ def get_conversation_detail(conv_id: str):
 def delete_conversation(conv_id: str):
     try:
         db = get_firestore_client()
+        if db is None:
+            raise HTTPException(status_code=503, detail="Firebase 데이터베이스가 구성되지 않았습니다.")
         db.collection("conversations").document(conv_id).delete()
         return {"status": "success", "message": "삭제되었습니다."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -793,7 +860,11 @@ def delete_conversation(conv_id: str):
 def update_conversation_title(conv_id: str, data: ConversationTitleUpdate):
     try:
         db = get_firestore_client()
+        if db is None:
+            raise HTTPException(status_code=503, detail="Firebase 데이터베이스가 구성되지 않았습니다.")
         db.collection("conversations").document(conv_id).update({"title": data.title})
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

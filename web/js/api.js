@@ -4,7 +4,9 @@
 
 // 개발(Local) 및 운영(Vercel 등) 환경에 따른 API URL 설정
 // 추후 Vercel 환경변수로 주입받거나, 현재 호스트 기반으로 분기할 수 있습니다.
-const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" ? "http://localhost:8090" : "https://여기에_추후_RENDER_서버주소_입력"; // TODO: Render 배포 후 URL 업데이트
+const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+	? "http://localhost:8090" 
+	: "https://codyssey-m1-2-fimf.onrender.com";
 
 /**
  * 공통 fetch 래퍼 함수
