@@ -13,7 +13,7 @@
 | **최종 결과물 3** | **대화 기록 저장 및 불러오기** (대화 저장, 목록 조회, 특정 대화 불러오기) | **100% 충족** | • Firestore `conversations` 컬렉션 자동 저장<br>• `GET/POST/DELETE/PUT /api/conversations`, `GET /api/conversations/{id}` 지원<br>• 사이드바 목록 클릭 시 대화 복원 ([`web/js/chat.js`](file:///Users/mongpark/codyssey/codyssey_m1_2/web/js/chat.js#L132)) |
 | **최종 결과물 4** | **배포 및 문서화** (Swagger UI 확인 가능, README 안내, 스크린샷 3종 가이드) | **100% 충족** | • Docker Compose 로컬 배포 및 Render/Vercel 타깃 구성<br>• Swagger UI (`/docs`) 완비<br>• README.md 내 환경변수, 실행법, 스크린샷 3종 가이드 수록 |
 | **데이터 선정** | 시계열 데이터 선정 및 최소 100개 이상 포인트, 요약 지표 산출 | **100% 충족** | • 삼성전자(`005930.KS`) 10년치 일별 데이터 **2,445건** 확보<br>• 최고/최저/평균/변동성/MDD/최근추세 요약 API (`/api/data/summary`) |
-| **FastAPI 구성** | 앱 초기화, CORS 미들웨어 설정, Pydantic 검증 | **100% 충족** | • `CORSMiddleware` 적용 완료<br>• `DataItem`, `PortfolioItem`, `ChatRequest`, `ConversationCreate` 스키마 검증 |
+| **FastAPI 구성** | 앱 초기화, CORS 미들웨어 설정, Pydantic 검증, 라우터/서비스 레이어드 아키텍처 및 보안 필터링 | **100% 충족** | • `CORSMiddleware` 및 `SecurityLoggingMiddleware` 전역 적용<br>• `routers/`, `services/`, `models/`, `core/` 책임 완전 분리 (단일 `main.py` 880줄 $\rightarrow$ 65줄 슬림화)<br>• Pydantic `@field_validator` 기반 XSS/스크립트 차단, HTML 이스케이프, 정규식 화이트리스트, 수치/길이 제약 및 보안 감사 로깅 |
 | **Firestore 연동**| 영구 데이터베이스 연동 및 서비스 계정 키 환경 변수 격리 관리 | **100% 충족** | • `FIREBASE_SERVICE_ACCOUNT_JSON` 환경 변수 분기 처리<br>• `stock_data`, `portfolio`, `conversations`, `metadata` 컬렉션 설계 |
 | **보너스 과제 1**| AI 도구 호출 (Function Calling) 스키마 정의 및 연동, README Rationale | **100% 충족** | • 3대 도구(`query_stock_data`, `analyze_portfolio`, `get_conversation_history`) 연동<br>• README에 호출 근거 및 호출 흐름 다이어그램 수록 |
 | **보너스 과제 2**| 인사이트·UX 고도화 (차트 시각화, CSV 내보내기, 다크 모드 토글) | **100% 충족** | • Chart.js 꺾은선/캔들 차트<br>• 조회 데이터 CSV 다운로드 기능<br>• CSS 변수 및 LocalStorage 기반 다크 모드 토글 |
@@ -52,6 +52,18 @@
 ### 6) 2종 차트(Line & Box/Candle) 및 자유 캘린더 구간 필터
 - 고정된 기간 버튼(1일, 1주, 1개월, 1년) 외에도, 사용자가 원하는 임의의 날짜 구간(`start-date` ~ `end-date`)을 직접 선택하여 조회할 수 있는 캘린더 인터페이스를 지원하며, 꺾은선 차트와 캔들스틱(시가/고가/저가/종가) 박스 차트 간의 토글 기능을 제공합니다.
 
+### 7) 🛡️ 엔터프라이즈 보안 입력 필터링 및 레이어드 아키텍처 (사전평가 피드백 완벽 반영)
+사전평가에서 제시된 2가지 개선 권고사항을 100% 반영하여 시스템 보안성과 아키텍처 확장성을 대폭 고도화했습니다:
+- **피드백 1: 악성 입력 필터링(스크립트/HTML 인젝션, 길이·문자 검증) 및 보안 모니터링**:
+  - `api/core/security.py` 모듈 구축: 위험 정규식 패턴(`script`, `iframe`, `javascript:`, `onerror`, SQL 인젝션 구문 등)을 실시간 탐색하는 `check_malicious_input()` 구현.
+  - HTML 특수문자 이스케이프(`sanitize_text`)를 통해 XSS를 무력화하고, 날짜 입력(`YYYY-MM-DD`)에 대한 엄격한 달력 유효성 화이트리스트(`validate_date_format`) 적용.
+  - Pydantic 모델(`DataItem`, `PortfolioItem`, `ChatRequest`) 전반에 `@field_validator` 및 길이 제약(메모 500자, 질문 1,000자, 세션ID 정규식 `^[a-zA-Z0-9_-]{1,64}$`), 수치 범위(단가 0원 초과 1,000만원 이하, 수량 1~1,000,000주) 제약 적용.
+  - 악성 시도 발생 시 발신자 IP, 위험 페이로드, 필드명을 실시간으로 기록하는 보안 감사 로깅(`log_security_alert`) 및 `SecurityLoggingMiddleware` 탑재.
+- **피드백 2: 라우터(APIRouter) 및 서비스(Services) 레이어 분리**:
+  - 기존 880줄에 달하던 모놀리식 단일 파일(`api/main.py`)을 단 **65줄의 슬림한 애플리케이션 조립 진입점**으로 리팩토링.
+  - 책임 분리: `api/core/`(설정/DB/보안), `api/models/`(Pydantic 스키마), `api/services/`(주가/포트폴리오/채팅 비즈니스 로직), `api/routers/`(HTTP 엔드포인트 라우터).
+  - 자동화 검증 스크립트([`test_security_and_routes.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/test_security_and_routes.py))를 통해 보안 필터링과 레이어드 분리 구조가 100% 정상 작동함을 입증.
+
 ---
 
 ## 3. 🎓 과제 목표 6대 핵심 질문에 대한 심층 기술 해설
@@ -64,19 +76,37 @@
    - AI 서비스 계층에서는 이 요약 정보를 시스템 프롬프트(컨텍스트)로 주입하여, AI가 방대한 원천 데이터를 일일이 읽지 않고도 핵심 통계를 바탕으로 즉각적이고 정확한 분석 답변을 생성하게 만듭니다.
 
 ### Q2. FastAPI 프로젝트를 라우터/서비스 등으로 분리해 구성한 기준은 무엇인가?
-- **관심사 분리 (Separation of Concerns)** 원칙을 준수했습니다:
-  - **진입점 및 라우팅 (`api/main.py`)**: 클라이언트의 HTTP 요청 수신, CORS 제어, Pydantic 요청 본문 검증, HTTP 상태 코드 반환 등 웹 계층의 책임을 담당합니다.
-  - **데이터 수집 파이프라인 (`api/lib/collect_data.py`)**: 외부 금융 API(`yfinance`) 통신, 판다스 데이터프레임 변환, Firestore 대량 적재(Batch Write) 등 데이터 엔지니어링 로직을 격리했습니다.
-  - **AI 지능형 서비스 (`api/lib/ai_service.py`)**: LLM 모델 초기화, 시스템 지침 설계, 도구 정의 및 자동 함수 호출(Automatic Function Calling), 예외 시 모델 폴백(Fallback) 등 AI 비즈니스 로직을 전담합니다.
-- 이를 통해 특정 계층의 변경(예: Gemini $\rightarrow$ GPT 모델 교체, 또는 DB 스키마 변경)이 다른 계층에 영향을 주지 않는 모듈식 유지보수성을 달성했습니다.
+- **관심사 분리 (Separation of Concerns) 및 계층형(Layered) 아키텍처**를 엄격히 준수하여 책임을 5개 계층으로 분리했습니다:
+  1. **진입점 및 미들웨어 계층 (`api/main.py`)**: 단 65줄로 구성되며, FastAPI 인스턴스 생성, 전역 CORS 및 보안 로깅 미들웨어 부착, 4대 라우터 등록만을 전담합니다.
+  2. **라우터 계층 (`api/routers/`)**: HTTP 프로토콜 통신, 경로 매핑, 쿼리 파라미터 제약 및 상태 코드 반환을 담당합니다.
+     - `data.py`: 주가 데이터 조회 및 요약 통계 (`/api/data`, `/api/data/summary`)
+     - `portfolio.py`: 가상 포트폴리오 CRUD (`/api/portfolio`)
+     - `chat.py`: AI 대화 엔드포인트 (`/api/chat`)
+     - `conversations.py`: 대화 세션 관리 (`/api/conversations`)
+  3. **서비스 계층 (`api/services/`)**: 순수 비즈니스 로직과 알고리즘 연산을 격리했습니다.
+     - `stock_service.py`: 10년치 주가 캐시 조회, MDD/변동성/이동평균 연산, 휴장일 역추적 폴백, 주가 질의 Function Calling 도구
+     - `portfolio_service.py`: 포트폴리오 CRUD 및 최신 종가 대조 실시간 미실현 손익/수익률 계산 도구
+     - `chat_service.py`: 대화 세션 관리, 컨텍스트 주입 및 도구 호출 제어, 대화 기록 복원 도구
+  4. **모델 계층 (`api/models/`)**: Pydantic 스키마 정의 및 다층 입력 검증을 전담합니다 (`DataItem`, `PortfolioItem`, `ChatRequest`, `ConversationCreate` 등).
+  5. **코어 인프라 계층 (`api/core/`)**: 전역 설정(`config.py`), 데이터베이스 커넥션 풀(`database.py`), 악성 입력 탐지 및 보안 로깅(`security.py`)을 공통 모듈화했습니다.
+- 이를 통해 특정 계층의 변경(예: DB 마이그레이션, AI 모델 교체, 보안 정책 강화)이 다른 계층에 영향을 주지 않는 모듈식 확장성을 달성했습니다.
 
 ### Q3. Pydantic을 활용해 요청 데이터 검증을 적용한 이유와 방식은 무엇인가?
-- **이유**: 동적 타입 언어인 Python 환경에서 클라이언트가 전달한 JSON 페이로드의 타입 불일치(예: `price`에 문자열 입력), 필수 필드 누락, 유효하지 않은 열거값(예: `trade_type`에 "hold" 입력)을 런타임 이전에 차단하여 백엔드 안정성과 데이터 무결성을 보장하기 위함입니다.
-- **적용 방식**:
-  - `DataItem`: `date: str`, `value: float`, `memo: str = ""` 필드를 정의하여 표준 데이터 CRUD 시 자동 검증.
-  - `PortfolioItem`: `trade_type: Literal["buy", "sell"]`을 통해 오직 'buy'와 'sell'만 허용하고, `price: float`, `quantity: int`를 강제.
-  - `ChatRequest`: `message: str`, `conversation_id: str | None = None`을 통해 안전한 세션 ID 전달 보장.
-  - 유효하지 않은 데이터 유입 시 FastAPI가 자동으로 `422 Unprocessable Entity` 에러와 상세 필드 위치를 클라이언트에 반환합니다.
+- **이유**: 동적 타입 언어인 Python 환경에서 클라이언트가 전달한 악성 스크립트, 잘못된 타입, 범위를 벗어난 수치값, SQL/HTML 인젝션 공격을 런타임 진입 단계에서 사전에 차단하여 백엔드 안정성과 데이터 무결성, 서비스 보안을 보장하기 위함입니다.
+- **적용 방식 (다층 방어 체계)**:
+  1. **엄격한 타입 및 스키마 강제**:
+     - `DataItem`: `date: str`, `value: float`, `memo: str` 필드 정의
+     - `PortfolioItem`: `trade_type: Literal["buy", "sell"]` 열거형 제약, `price: float`, `quantity: int`
+     - `ChatRequest`: `message: str`, `conversation_id: str | None = None`
+  2. **`@field_validator` 기반 악성 입력(XSS/SQLi) 실시간 차단**:
+     - `<script>`, `<iframe>`, `javascript:`, `onerror=`, `DROP TABLE` 등 위험 패턴 탐지 시 즉시 거부 및 보안 감사 로그(`log_security_alert`) 기록.
+     - `memo` 등 사용자 텍스트 필드에 `sanitize_text()`(HTML 엔티티 이스케이프) 적용.
+  3. **날짜 형식 화이트리스트 검증 (`validate_date_format`)**:
+     - 정규식 `^\d{4}-\d{2}-\d{2}$` 및 `datetime.strptime` 교차 검증을 통해 유효하지 않은 날짜(예: `2024-02-30`, `2024-99-99`)를 원천 차단.
+  4. **수치 범위 및 길이 제약**:
+     - 질문 1,000자 제한, 메모 500자 제한, 세션 ID 영숫자 64자 정규식 화이트리스트(`^[a-zA-Z0-9_-]{1,64}$`).
+     - 주가: $0 < \text{value} \le 10,000,000$원, 수량: $1 \le \text{quantity} \le 1,000,000$주.
+  5. 유효하지 않은 입력 유입 시 FastAPI가 자동으로 상세 에러 위치와 함께 `422 Unprocessable Entity`를 반환합니다.
 
 ### Q4. Firestore에 데이터를 저장하고 CRUD로 다루는 방법은 무엇인가?
 - **NoSQL 컬렉션-문서 모델**:

@@ -1,6 +1,11 @@
 import os
-import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted, GoogleAPIError
+try:
+    import google.generativeai as genai
+    from google.api_core.exceptions import ResourceExhausted, GoogleAPIError
+except ImportError:
+    genai = None
+    ResourceExhausted = Exception
+    GoogleAPIError = Exception
 
 MODEL_LIST = [
     "gemini-2.5-flash",
@@ -24,6 +29,9 @@ def generate_ai_reply(user_message: str, context_data: str = "", tools: list = N
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return "안내: API 키가 설정되지 않아 답변을 생성할 수 없습니다."
+
+    if genai is None:
+        return "안내: google-generativeai 라이브러리가 설치되지 않았습니다."
 
     genai.configure(api_key=api_key)
     

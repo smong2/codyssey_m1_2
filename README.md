@@ -73,16 +73,17 @@
 
 ## 🛠 기술 스택 (Tech Stack)
 
-| 계층                   | 기술                                      | 사용 목적 및 라이브러리                                                        |
-| :--------------------- | :---------------------------------------- | :----------------------------------------------------------------------------- |
-| **Frontend**           | Vanilla JS (ES6+), HTML5, CSS3            | 프레임워크 없는 순수 웹 표준, 반응형 레이아웃, 다크 모드 CSS 변수              |
-| **Data Visualization** | Chart.js, FontAwesome                     | 주가 시계열 꺾은선/박스 차트 렌더링, UI 아이콘                                 |
-| **Backend**            | Python 3.10+, FastAPI, Uvicorn            | 고성능 비동기 REST API 서버, 자동 Swagger UI 문서화                            |
-| **Data Validation**    | Pydantic v1/v2                            | API 요청/응답 스키마 엄격 검증 (`DataItem`, `PortfolioItem`, `ChatRequest` 등) |
-| **Database**           | Firebase Firestore, SQLite3               | Firestore(영구 저장 및 클라우드 동기화), SQLite(로컬 2계층 고속 캐싱 DB)       |
-| **AI / LLM**           | Google Gemini API (`google-generativeai`) | Context Injection, Automatic Function Calling, 낮은 온도(0.1) 환각 억제        |
-| **Data Collection**    | yfinance, Pandas                          | 삼성전자(`005930.KS`) 10년치 OHLCV 시계열 데이터 자동 수집                     |
-| **DevOps & Deploy**    | Docker, Docker Compose, Render, Vercel    | 컨테이너화 개발 환경, Backend(Render) 및 Frontend(Vercel) 배포                 |
+| 계층                    | 기술                                      | 사용 목적 및 라이브러리                                                        |
+| :---------------------- | :---------------------------------------- | :----------------------------------------------------------------------------- |
+| **Frontend**            | Vanilla JS (ES6+), HTML5, CSS3            | 프레임워크 없는 순수 웹 표준, 반응형 레이아웃, 다크 모드 CSS 변수              |
+| **Data Visualization**  | Chart.js, FontAwesome                     | 주가 시계열 꺾은선/박스 차트 렌더링, UI 아이콘                                 |
+| **Backend**             | Python 3.10+, FastAPI, Uvicorn            | 고성능 비동기 REST API 서버, 자동 Swagger UI 문서화                            |
+| **Data Validation**     | Pydantic v1/v2                            | API 요청/응답 스키마 엄격 검증 (`DataItem`, `PortfolioItem`, `ChatRequest` 등) |
+| **Security & Auditing** | Regular Expression, HTML Sanitizer        | XSS/SQLi 차단, 날짜 화이트리스트, 길이/수치 제약, 보안 로깅 미들웨어           |
+| **Database**            | Firebase Firestore, SQLite3               | Firestore(영구 저장 및 클라우드 동기화), SQLite(로컬 2계층 고속 캐싱 DB)       |
+| **AI / LLM**            | Google Gemini API (`google-generativeai`) | Context Injection, Automatic Function Calling, 낮은 온도(0.1) 환각 억제        |
+| **Data Collection**     | yfinance, Pandas                          | 삼성전자(`005930.KS`) 10년치 OHLCV 시계열 데이터 자동 수집                     |
+| **DevOps & Deploy**     | Docker, Docker Compose, Render, Vercel    | 컨테이너화 개발 환경, Backend(Render) 및 Frontend(Vercel) 배포                 |
 
 ---
 
@@ -120,9 +121,9 @@ Swagger UI (`/docs`)를 통해 대화형 API 테스트가 가능합니다.
 
 ## 🔗 배포 URL
 
-- **Frontend (Vercel)**: `https://codyssey-m1-2.vercel.app` _(배포 주소 입력)_
-- **Backend API (Render)**: `https://codyssey-m1-2.onrender.com` _(배포 주소 입력)_
-- **API Documentation (Swagger UI)**: `https://codyssey-m1-2.onrender.com/docs`
+- **Frontend (Vercel)**: `https://codyssey-m1-2-9ht406z50-smong2.vercel.app/`
+- **Backend API (Render)**: `https://codyssey-m1-2-fimf.onrender.com`
+- **API Documentation (Swagger UI)**: `https://codyssey-m1-2-fimf.onrender.com/docs`
 
 > **Note (Render 콜드스타트 안내)**: Render 무료 티어는 15분간 비활성 시 슬립 모드로 진입합니다. 첫 API 호출 시 약 30~50초의 지연이 발생할 수 있으며, 프론트엔드에 로딩 인디케이터가 적용되어 있습니다.
 
@@ -132,11 +133,29 @@ Swagger UI (`/docs`)를 통해 대화형 API 테스트가 가능합니다.
 
 ```text
 codyssey_m1_2/
-├── api/                             # FastAPI 백엔드 영역
+├── api/                             # FastAPI 백엔드 영역 (엔터프라이즈 레이어드 아키텍처)
+│   ├── core/                        # 핵심 인프라 및 보안 설정
+│   │   ├── config.py                # 환경 변수 및 설정
+│   │   ├── database.py              # SQLite 및 Firestore 연결 풀 관리
+│   │   └── security.py              # 악성 입력(XSS/SQLi) 탐지, 정제, 보안 감사 로깅 미들웨어
+│   ├── models/                      # Pydantic v1/v2 입력 유효성 검증 모델 계층
+│   │   ├── data.py                  # DataItem (날짜 형식 화이트리스트, XSS 정제, 수치 범위)
+│   │   ├── portfolio.py             # PortfolioItem (trade_type, price, quantity)
+│   │   └── chat.py                  # ChatRequest (길이 제한, ID 화이트리스트), Conversation 모델
+│   ├── services/                    # 비즈니스 로직 및 도구 실행 계층
+│   │   ├── stock_service.py         # 10년치 주가 캐시 조회, MDD/변동성 연산, 주가 질의 도구
+│   │   ├── portfolio_service.py     # 가상 포트폴리오 CRUD 및 실시간 평가 손익/수익률 계산 도구
+│   │   └── chat_service.py          # AI 세션 관리, 컨텍스트 주입, 대화 기록 복원 도구
+│   ├── routers/                     # APIRouter 기반 웹 엔드포인트 계층
+│   │   ├── data.py                  # /api/data, /api/data/summary
+│   │   ├── portfolio.py             # /api/portfolio
+│   │   ├── chat.py                  # /api/chat
+│   │   └── conversations.py         # /api/conversations
 │   ├── lib/
-│   │   ├── ai_service.py            # Gemini 연동, 시스템 프롬프트, 도구 호출 제어
-│   │   └── collect_data.py          # yfinance 주가 수집 및 Firestore 업로드/버전 관리
-│   ├── main.py                      # FastAPI 엔드포인트, 도구 정의, SQLite 캐시 연동
+│   │   ├── ai_service.py            # Gemini 연동 및 자동 함수 호출 (Function Calling)
+│   │   └── collect_data.py          # yfinance 주가 수집 및 Firestore 대량 적재
+│   ├── main.py                      # 모듈 조립 진입점, 미들웨어 부착 (65줄 슬림화)
+│   ├── mcp_server.py                # 표준 MCP(Model Context Protocol) JSON-RPC 서버
 │   ├── stock_cache.db               # 10년치 주가 데이터 SQLite 로컬 캐시 (2,445건)
 │   ├── serviceAccountKey.json       # Firebase Admin SDK 서비스 계정 인증 키
 │   ├── .env                         # 로컬 환경 변수 파일
@@ -154,6 +173,9 @@ codyssey_m1_2/
 │   │   └── chat.js                  # 실시간 AI 채팅 인터랙션, 마크다운 표 렌더러, 세션 관리
 │   └── index.html                   # 메인 대시보드 및 채팅 통합 뷰
 ├── start.sh                         # 원클릭 Docker 빌드 및 구동 스크립트
+├── test_security_and_routes.py      # 사전평가 대응 보안/아키텍처 자동화 검증 스크립트
+├── test_mcp_client.py               # MCP 프로토콜 및 도구 호출 검증 클라이언트
+├── demo_mcp_tutorial.py             # 비전공자/입문자를 위한 4단계 MCP 시연 튜토리얼
 ├── README.md                        # 프로젝트 설명서 및 실행 가이드
 ├── add_report.md                    # 요구사항 대비 완성도 분석 및 심층 기술 보고서
 └── topic.md                         # 초기 기획 배경 및 요구사항 정의서
@@ -227,6 +249,37 @@ docker compose -f docker/docker-compose.yml up --build -d
 5. **내보내기** <img src="./asset/내보내기.png" width=100% />
 
 6. **MCP Test** <img src="./asset/mcp_test.png" width=100% />
+
+---
+
+## 6. 🛡️ 보안 입력 검증 및 엔터프라이즈 레이어드 아키텍처 (사전평가 피드백 완벽 반영)
+
+사전평가 피드백을 적극 수렴하여 단일 파일(`main.py`) 모놀리스 구조를 탈피하고, 악성 스크립트 및 비정상 입력을 원천 차단하는 엔터프라이즈급 레이어드 아키텍처와 다층 보안 체계를 구축했습니다.
+
+### 1) 악성 입력 필터링 및 다층 보안 방어 (`api/core/security.py`, `api/models/`)
+
+- **XSS & 스크립트 인젝션 차단**: `<script>`, `<iframe>`, `javascript:`, `onerror=`, SQL 인젝션 패턴 등 위험 페이로드를 실시간 정규식으로 감지하여 차단.
+- **HTML 엔티티 정제 (Sanitization)**: 사용자 입력 텍스트(`memo` 등)의 HTML 특수기호(`&`, `<`, `>`, `"`, `'`)를 안전하게 이스케이프 처리.
+- **날짜 화이트리스트 검증 (`validate_date_format`)**: `YYYY-MM-DD` 정규식뿐만 아니라 윤년 및 실제 달력 일자(`datetime.strptime`)를 검증하여 `2024-02-30`, `2024-99-99` 등 무효 날짜 차단.
+- **수치 범위 및 길이 제약**: 질문 최대 1,000자, 메모 500자, 세션 ID 64자 영숫자 화이트리스트, 주가(0 < v <= 10,000,000), 수량(1 <= q <= 1,000,000) 제약.
+- **보안 감사 로깅 및 모니터링 (`SecurityLoggingMiddleware`)**: 비정상 요청 및 인젝션 시도 발생 시 클라이언트 IP, 공격 필드, 유입 페이로드를 실시간 경고 로깅(`log_security_alert`).
+
+### 2) 라우터(APIRouter) 및 서비스(Services) 레이어 분리
+
+- **`api/main.py` 슬림화**: 기존 880줄의 모놀리식 구조에서 **65줄의 초경량 진입점**으로 리팩토링.
+- **계층 분리 체계**:
+  - `api/core/`: 전역 설정, DB 커넥션 풀, 보안/로깅 유틸
+  - `api/models/`: Pydantic 스키마 및 유효성 검증
+  - `api/services/`: 주가 분석, 포트폴리오 연산, AI 채팅 및 Function Calling 도구 로직
+  - `api/routers/`: APIRouter 기반 HTTP 엔드포인트 분리 (`data`, `portfolio`, `chat`, `conversations`)
+
+### 3) 자동화 검증 스크립트 (`python3 test_security_and_routes.py`)
+
+사전평가 피드백 2개 항목이 완벽히 해결되었음을 14개 이상의 단위/통합 테스트를 통해 즉시 증명합니다:
+
+```bash
+python3 test_security_and_routes.py
+```
 
 ---
 
