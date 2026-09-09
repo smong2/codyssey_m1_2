@@ -105,14 +105,53 @@
 
 ## 4. 🔌 보너스 과제: Model Context Protocol (MCP) 서버 구현 및 호출 흐름 검증
 
-### 1) 구현 개요 및 설계 철학
+### 1) 💡 누구나 쉽게 이해하는 MCP(Model Context Protocol)란? (비전공자/입문자 눈높이 해설)
+
+#### ① 왜 MCP라는 기술이 탄생했을까요?
+일반적인 AI(ChatGPT, Gemini 등)는 똑똑하지만 **"우리의 개인/회사 내부 데이터"나 "오늘의 최신 주가"는 전혀 모릅니다.**
+그렇다면 AI에게 내 데이터를 바탕으로 대화하게 하려면 어떻게 해야 할까요?
+- **방법 1 (무식하게 전부 복사-붙여넣기)**: 10년치 삼성전자 주가 데이터(2,445일치)를 질문할 때마다 프롬프트에 몽땅 집어넣습니다.
+  - ❌ **결과**: 질문 한 번에 수만 원의 토큰 요금이 청구되고, 답변이 몇십 초씩 걸리며, 데이터가 너무 길어 중간 날짜를 잊어버리는 **환각(Hallucination)**이 발생합니다.
+- **방법 2 (MCP 방식 - 필요할 때만 스스로 도구를 찾아 쓰기)**:
+  - 평소에는 조용히 있다가, 사용자가 *"2024년 4월 15일 주가 얼마였어?"*라고 물어볼 때만 AI가 우리 컴퓨터의 데이터베이스에 살짝 물어보고 답변하게 만듭니다.
+  - 이처럼 **AI에게 안전하게 우리 컴퓨터의 프로그램을 실행할 수 있는 '손과 발'을 달아주는 세계 표준 기술**이 바로 **MCP**입니다.
+
+#### ② 가장 쉬운 비유: "AI를 위한 만능 USB-C 케이블"
+우리가 마우스, 키보드, 외장하드를 살 때 제조사가 어디든 상관없이 **USB-C 단자**만 있으면 맥북이든 윈도우 PC든 바로 꽂아서 쓸 수 있습니다.
+- **MCP는 소프트웨어 세계의 USB-C 포트**입니다.
+- 우리가 삼성전자 주가 DB와 포트폴리오 계산기를 **MCP라는 표준 규격**에 맞춰 만들어 두기만 하면,
+- Google Gemini, Antigravity, Claude, Cursor 등 **어떤 AI 모델이든 코드 수정 없이 플러그만 꽂으면 즉시 우리 데이터를 조회하고 계산**할 수 있게 됩니다.
+
+#### ③ 식당 비유로 보는 MCP 실제 동작 4단계
+```text
+[사용자] "2024년 4월 15일 삼성전자 주가 알려줘!"
+   ↓
+[AI 클라이언트] (손님) ───① 악수 (initialize)───> [MCP 서버] (식당 주방)
+                (손님) <──② 메뉴판 (tools/list)─── [MCP 서버] (주가조회, 분석 등 메뉴 제공)
+                (손님) ───③ 주문 (tools/call)────> [MCP 서버] (로컬 SQLite 창고에서 78,870원 꺼냄)
+                (손님) <──④ 요리 전달────────────── [MCP 서버]
+   ↓
+[AI 클라이언트] "2024년 4월 15일 종가는 78,870원이었습니다!" (최종 답변 생성)
+```
+
+#### ④ 1분 만에 직접 눈으로 확인하는 튜토리얼 스크립트 제공
+MCP가 실제로 어떻게 대화하는지 누구나 눈으로 직접 체험해 볼 수 있도록 프로젝트 루트에 [`demo_mcp_tutorial.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/demo_mcp_tutorial.py)를 탑재했습니다.
+터미널에서 아래 명령어를 실행하고 [Enter]를 누르면 위 4단계의 실제 JSON 대화가 컬러풀하게 한 단계씩 펼쳐집니다:
+```bash
+python3 demo_mcp_tutorial.py
+```
+
+---
+
+### 2) 구현 개요 및 설계 철학
 - **배경 및 목적**: 과제 가이드의 보너스 항목인 "동일 기능을 MCP 서버 또는 GPT 액션 중 1개 방식으로도 연동해 호출 흐름을 검증한다"를 완벽히 충족하기 위해, Anthropic/Google/OpenSource 진영의 개방형 표준 프로토콜인 **Model Context Protocol (MCP)** 서버를 구축했습니다.
 - **환경 적합성**: 본 프로젝트는 사용자의 개발 환경(Google Gemini, Antigravity, VS Code/Cursor)에 100% 최적화되어 외부 유료 계정(OpenAI, Claude API 키)이나 불필요한 무거운 의존성 없이 **표준 라이브러리 기반의 JSON-RPC 2.0 stdio 프로토콜**로 설계되었습니다.
 - **핵심 구현 파일**:
   - 서버 진입점: [`api/mcp_server.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py)
   - 자동화 검증 클라이언트: [`test_mcp_client.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/test_mcp_client.py)
+  - 인터랙티브 이해 튜토리얼: [`demo_mcp_tutorial.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/demo_mcp_tutorial.py)
 
-### 2) MCP 지원 메서드 및 도구 명세
+### 3) MCP 지원 메서드 및 도구 명세
 | MCP 메서드 / 도구명 | 프로토콜 역할 및 기능 | 반환 데이터 포맷 |
 | :--- | :--- | :--- |
 | `initialize` | MCP 클라이언트와의 버전 협상 (`2024-11-05`), 서버 메타데이터 및 도구 지원 능력 브로드캐스트 | `serverInfo: { name: "samsung-stock-agent-mcp", version: "1.0.0" }` |
@@ -122,7 +161,7 @@
 | `tools/call` (`analyze_portfolio`) | 가상 포트폴리오(매수/매도)와 최신 종가를 실시간 대조하여 평가액/수익률 계산 | 총 매수/매도 수량, 평단가, 실시간 평가액, 평가 손익 및 수익률(%) |
 | `tools/call` (`get_conversation_history`) | 특정 대화방 세션의 직전 컨텍스트 조회 | 세션별 이전 대화 문맥 정보 |
 
-### 3) Antigravity / Gemini 환경 연동 가이드
+### 4) Antigravity / Gemini 환경 연동 가이드
 사용자의 AI 어시스턴트(Google Antigravity 또는 Cursor 등)의 MCP 설정 파일에 아래 JSON 블록을 등록하면, 에이전트가 대화 중 언제든 로컬 주가 DB와 포트폴리오를 자율적으로 호출할 수 있습니다:
 
 ```json
@@ -141,7 +180,7 @@
 }
 ```
 
-### 4) 자동화 검증 클라이언트 실행 결과 증빙 (`python3 test_mcp_client.py`)
+### 5) 자동화 검증 클라이언트 실행 결과 증빙 (`python3 test_mcp_client.py`)
 아래는 `test_mcp_client.py`를 실행하여 4단계 MCP 핸드셰이크 및 실제 도구 호출을 검증한 실제 터미널 출력 전문입니다:
 
 ```text

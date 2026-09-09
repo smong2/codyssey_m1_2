@@ -226,6 +226,8 @@ docker compose -f docker/docker-compose.yml up --build -d
 
 5. **내보내기** <img src="./asset/내보내기.png" width=100% />
 
+6. **MCP Test** <img src="./asset/mcp_test.png" width=100% />
+
 ---
 
 ## 7. 🔌 보너스 과제: Model Context Protocol (MCP) 서버 연동
