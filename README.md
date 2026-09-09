@@ -10,6 +10,7 @@
 일반적인 범용 LLM은 기업의 내부 데이터나 개인의 포트폴리오 상태를 알지 못해 "삼성전자 이번 달 수익률이 어때?", "2023년 주가 흐름은 어땠어?"와 같은 질문에 두루뭉술한 답변만 제공합니다.
 
 본 서비스는 **2016년부터 2026년까지의 삼성전자 10년치 일별 주가 데이터(2,445건)**와 사용자의 **가상 매수/매도 기록**을 바탕으로:
+
 1. **데이터 요약 기반 컨텍스트 주입(Context Injection)**과
 2. **3대 전용 도구(Function Calling)**를 결합하여,
 
@@ -19,13 +20,13 @@
 
 ## 📋 주요 기능
 
-| 기능 영역 | 상세 설명 |
-| :--- | :--- |
-| **1. 데이터 기반 AI 채팅** | • 시스템 프롬프트에 최근 1개월 요약 지표 자동 주입<br>• 질문 성격에 따라 3대 도구(주가 DB, 포트폴리오, 대화 기록) 자동 호출<br>• 수치 데이터 마크다운 표(`\|---\|`) 렌더링 및 로딩 애니메이션 |
-| **2. 데이터 관리 (CRUD)** | • **데이터 API**: `(date, value, memo)` 표준 CRUD (`POST/GET/PUT/DELETE /api/data`)<br>• **가상 포트폴리오 CRUD**: 매수/매도 유형, 날짜, 단가, 수량 실시간 등록/삭제/목록 갱신 |
-| **3. 시계열 데이터 시각화** | • Chart.js 기반 **꺾은선(Line) 차트** 및 **박스(캔들스틱) 차트** 지원<br>• 기간 퀵 필터(1일, 1주, 1개월, 1년) 및 **사용자 지정 캘린더 날짜 검색**<br>• 기간 내 시초가, 종가, 등락률, 최고/최저/평균가 실시간 연산 |
-| **4. 대화 기록 저장 및 복원** | • 모든 질의응답 Firestore `conversations` 자동 저장<br>• 사이드바에서 이전 대화 목록 조회 및 클릭 시 대화 내용 복원<br>• 대화 세션 인라인 제목 수정(`PUT`) 및 삭제(`DELETE`) 지원 |
-| **5. UX 및 인사이트 고도화** | • 라이트 / 다크 모드 토글 (LocalStorage 영구 저장)<br>• 조회 중인 주가 데이터 **CSV 파일 즉시 내보내기**<br>• SQLite 2계층 캐시를 통한 Firestore 읽기 비용 및 응답 속도 최적화 |
+| 기능 영역                     | 상세 설명                                                                                                                                                                                                         |
+| :---------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. 데이터 기반 AI 채팅**    | • 시스템 프롬프트에 최근 1개월 요약 지표 자동 주입<br>• 질문 성격에 따라 3대 도구(주가 DB, 포트폴리오, 대화 기록) 자동 호출<br>• 수치 데이터 마크다운 표(`\|---\|`) 렌더링 및 로딩 애니메이션                     |
+| **2. 데이터 관리 (CRUD)**     | • **데이터 API**: `(date, value, memo)` 표준 CRUD (`POST/GET/PUT/DELETE /api/data`)<br>• **가상 포트폴리오 CRUD**: 매수/매도 유형, 날짜, 단가, 수량 실시간 등록/삭제/목록 갱신                                    |
+| **3. 시계열 데이터 시각화**   | • Chart.js 기반 **꺾은선(Line) 차트** 및 **박스(캔들스틱) 차트** 지원<br>• 기간 퀵 필터(1일, 1주, 1개월, 1년) 및 **사용자 지정 캘린더 날짜 검색**<br>• 기간 내 시초가, 종가, 등락률, 최고/최저/평균가 실시간 연산 |
+| **4. 대화 기록 저장 및 복원** | • 모든 질의응답 Firestore `conversations` 자동 저장<br>• 사이드바에서 이전 대화 목록 조회 및 클릭 시 대화 내용 복원<br>• 대화 세션 인라인 제목 수정(`PUT`) 및 삭제(`DELETE`) 지원                                 |
+| **5. UX 및 인사이트 고도화**  | • 라이트 / 다크 모드 토글 (LocalStorage 영구 저장)<br>• 조회 중인 주가 데이터 **CSV 파일 즉시 내보내기**<br>• SQLite 2계층 캐시를 통한 Firestore 읽기 비용 및 응답 속도 최적화                                    |
 
 ---
 
@@ -72,16 +73,16 @@
 
 ## 🛠 기술 스택 (Tech Stack)
 
-| 계층 | 기술 | 사용 목적 및 라이브러리 |
-| :--- | :--- | :--- |
-| **Frontend** | Vanilla JS (ES6+), HTML5, CSS3 | 프레임워크 없는 순수 웹 표준, 반응형 레이아웃, 다크 모드 CSS 변수 |
-| **Data Visualization** | Chart.js, FontAwesome | 주가 시계열 꺾은선/박스 차트 렌더링, UI 아이콘 |
-| **Backend** | Python 3.10+, FastAPI, Uvicorn | 고성능 비동기 REST API 서버, 자동 Swagger UI 문서화 |
-| **Data Validation** | Pydantic v1/v2 | API 요청/응답 스키마 엄격 검증 (`DataItem`, `PortfolioItem`, `ChatRequest` 등) |
-| **Database** | Firebase Firestore, SQLite3 | Firestore(영구 저장 및 클라우드 동기화), SQLite(로컬 2계층 고속 캐싱 DB) |
-| **AI / LLM** | Google Gemini API (`google-generativeai`) | Context Injection, Automatic Function Calling, 낮은 온도(0.1) 환각 억제 |
-| **Data Collection** | yfinance, Pandas | 삼성전자(`005930.KS`) 10년치 OHLCV 시계열 데이터 자동 수집 |
-| **DevOps & Deploy** | Docker, Docker Compose, Render, Vercel | 컨테이너화 개발 환경, Backend(Render) 및 Frontend(Vercel) 배포 |
+| 계층                   | 기술                                      | 사용 목적 및 라이브러리                                                        |
+| :--------------------- | :---------------------------------------- | :----------------------------------------------------------------------------- |
+| **Frontend**           | Vanilla JS (ES6+), HTML5, CSS3            | 프레임워크 없는 순수 웹 표준, 반응형 레이아웃, 다크 모드 CSS 변수              |
+| **Data Visualization** | Chart.js, FontAwesome                     | 주가 시계열 꺾은선/박스 차트 렌더링, UI 아이콘                                 |
+| **Backend**            | Python 3.10+, FastAPI, Uvicorn            | 고성능 비동기 REST API 서버, 자동 Swagger UI 문서화                            |
+| **Data Validation**    | Pydantic v1/v2                            | API 요청/응답 스키마 엄격 검증 (`DataItem`, `PortfolioItem`, `ChatRequest` 등) |
+| **Database**           | Firebase Firestore, SQLite3               | Firestore(영구 저장 및 클라우드 동기화), SQLite(로컬 2계층 고속 캐싱 DB)       |
+| **AI / LLM**           | Google Gemini API (`google-generativeai`) | Context Injection, Automatic Function Calling, 낮은 온도(0.1) 환각 억제        |
+| **Data Collection**    | yfinance, Pandas                          | 삼성전자(`005930.KS`) 10년치 OHLCV 시계열 데이터 자동 수집                     |
+| **DevOps & Deploy**    | Docker, Docker Compose, Render, Vercel    | 컨테이너화 개발 환경, Backend(Render) 및 Frontend(Vercel) 배포                 |
 
 ---
 
@@ -90,6 +91,7 @@
 Swagger UI (`/docs`)를 통해 대화형 API 테스트가 가능합니다.
 
 ### 1. 데이터 API (Data CRUD & Summary)
+
 - `GET /api/data` : 분석 데이터 목록 조회 (query: `limit`)
 - `POST /api/data` : 새 분석 데이터 추가 (`date`, `value`, `memo`)
 - `PUT /api/data/{doc_id}` : 기존 분석 데이터 수정
@@ -97,11 +99,13 @@ Swagger UI (`/docs`)를 통해 대화형 API 테스트가 가능합니다.
 - `GET /api/data/summary` : 시스템 프롬프트 주입용 통계 요약 (최고/최저/평균, 최근 트렌드, 변동성, MDD)
 
 ### 2. 가상 투자 포트폴리오 API (Portfolio)
+
 - `GET /api/portfolio` : 사용자 가상 투자 내역 전체 조회
 - `POST /api/portfolio` : 매수/매도 기록 추가 (`trade_type`, `date`, `price`, `quantity`)
 - `DELETE /api/portfolio/{doc_id}` : 특정 가상 투자 기록 삭제
 
 ### 3. 대화 세션 API (Conversations)
+
 - `GET /api/conversations` : 대화 세션 목록 조회 (최근 수정순)
 - `POST /api/conversations` : 새 대화 세션 수동 저장
 - `GET /api/conversations/{conv_id}` : 특정 대화 세션의 전체 메시지 히스토리 조회
@@ -109,14 +113,15 @@ Swagger UI (`/docs`)를 통해 대화형 API 테스트가 가능합니다.
 - `DELETE /api/conversations/{conv_id}` : 대화 세션 삭제
 
 ### 4. AI 챗봇 API (AI Chat)
+
 - `POST /api/chat` : 자연어 질문 전달 $\rightarrow$ 데이터 요약 주입 $\rightarrow$ Function Calling 수행 $\rightarrow$ 대화 내역 Firestore 자동 저장 및 응답 반환
 
 ---
 
 ## 🔗 배포 URL
 
-- **Frontend (Vercel)**: `https://codyssey-m1-2.vercel.app` *(배포 주소 입력)*
-- **Backend API (Render)**: `https://codyssey-m1-2.onrender.com` *(배포 주소 입력)*
+- **Frontend (Vercel)**: `https://codyssey-m1-2.vercel.app` _(배포 주소 입력)_
+- **Backend API (Render)**: `https://codyssey-m1-2.onrender.com` _(배포 주소 입력)_
 - **API Documentation (Swagger UI)**: `https://codyssey-m1-2.onrender.com/docs`
 
 > **Note (Render 콜드스타트 안내)**: Render 무료 티어는 15분간 비활성 시 슬립 모드로 진입합니다. 첫 API 호출 시 약 30~50초의 지연이 발생할 수 있으며, 프론트엔드에 로딩 인디케이터가 적용되어 있습니다.
@@ -178,6 +183,7 @@ cp api/.env_sample api/.env
 ```
 
 **📋 필수 환경 변수 목록 (`api/.env`)**
+
 - `GEMINI_API_KEY`: Google Gemini API 키
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase 서비스 계정 키 파일 경로 또는 JSON 문자열
 - `API_BASE_URL`: 프론트엔드에서 참조할 백엔드 주소 (로컬: `http://localhost:8090`)
@@ -191,11 +197,13 @@ chmod +x start.sh
 ```
 
 또는 Docker Compose 직접 실행:
+
 ```bash
 docker compose -f docker/docker-compose.yml up --build -d
 ```
 
 ### 3. 로컬 접속 URL
+
 - **Frontend UI**: `http://localhost:3000`
 - **Backend Swagger UI**: `http://localhost:8090/docs`
 - **Backend Health Check**: `http://localhost:8090/`
@@ -206,12 +214,17 @@ docker compose -f docker/docker-compose.yml up --build -d
 
 과제 제출에 필요한 필수 3대 화면 캡처 영역입니다:
 
-1. **데이터 요약이 보이는 채팅 화면 (질문+답변 포함)**
-   - 대시보드 상단 요약 통계와 함께 우측 채팅창에서 과거 주가(예: "2024년 5월 10일 종가는?") 또는 포트폴리오 질문에 AI가 팩트 데이터 마크다운 표로 답변한 화면
-2. **데이터 관리 화면 (CRUD 동작 확인)**
-   - "💼 나의 가상 투자 기록" 섹션에서 매수/매도 내역을 추가하고, 포트폴리오 목록에 단가/수량/평가손익이 갱신되어 삭제 아이콘이 표시된 화면
-3. **대화 기록 화면 (불러오기 동작 확인)**
-   - 좌측 사이드바의 "이전 대화 기록" 목록에서 과거 대화방을 클릭하여 이전 질문과 답변 메시지가 채팅창에 재표시된 화면
+1. **데이터 요약이 보이는 채팅 화면 (질문+답변 포함)** <img src="./asset/채팅내용.png" width=100% />
+
+2. **데이터 관리 화면 (CRUD 동작 확인)**  
+   <img src="./asset/포트폴리오.png" width=100% />  
+   <img src="./asset/포트폴리오2.png" width=100% />
+3. **대화 기록 화면 (불러오기 동작 확인)** <img src="./asset/이전대화기록.png" width=100% /> <img src="./asset/전체화면-다크모드.png" width=100% />
+
+4. **Swagger 화면** <img src="./asset/swagger1.png" width=100% />  
+   <img src="./asset/swagger2.png" width=100% />
+
+5. **내보내기** <img src="./asset/내보내기.png" width=100% />
 
 ---
 
@@ -222,30 +235,31 @@ docker compose -f docker/docker-compose.yml up --build -d
 외부 유료 계정(OpenAI, Claude API 키) 없이 순수 표준 라이브러리 기반의 JSON-RPC 2.0 stdio 프로토콜로 작동하므로, **Google Gemini 및 Antigravity** 환경에서 100% 네이티브로 실행 및 연동이 가능합니다.
 
 ### 1) MCP 제공 도구 (3종)
+
 1. **`query_stock_data`**: 10년치 삼성전자 SQLite DB(2,445건)로부터 특정일 주가, 기간 요약 통계, 역대 최고/최저가 동적 질의
 2. **`analyze_portfolio`**: 가상 포트폴리오(매수/매도)와 최신 주가를 실시간 대조하여 평가액 및 미실현 손익/수익률 계산
 3. **`get_conversation_history`**: 세션별 대화 문맥 정보 동적 조회
 
 ### 2) Antigravity / Gemini / Cursor 연동 설정
+
 MCP를 지원하는 AI 환경(Google Antigravity, Claude Desktop, Cursor 등)의 설정 파일에 아래 구성을 등록합니다:
 
 ```json
 {
-  "mcpServers": {
-    "samsung-stock-assistant": {
-      "command": "python3",
-      "args": [
-        "/Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py"
-      ],
-      "env": {
-        "PYTHONIOENCODING": "utf-8"
-      }
-    }
-  }
+	"mcpServers": {
+		"samsung-stock-assistant": {
+			"command": "python3",
+			"args": ["/Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py"],
+			"env": {
+				"PYTHONIOENCODING": "utf-8"
+			}
+		}
+	}
 }
 ```
 
 ### 3) 호출 흐름 자동화 검증 스크립트 실행
+
 서버의 핸드셰이크 및 실제 도구 호출 흐름을 즉시 검증할 수 있는 테스트 클라이언트([`test_mcp_client.py`](file:///Users/mongpark/codyssey/codyssey_m1_2/test_mcp_client.py))가 제공됩니다.
 
 ```bash
@@ -253,6 +267,7 @@ python3 test_mcp_client.py
 ```
 
 **실제 검증 테스트 출력 결과:**
+
 ```text
 🚀 [MCP 테스트 클라이언트 시작] 서버 스크립트: /Users/mongpark/codyssey/codyssey_m1_2/api/mcp_server.py
 
@@ -337,4 +352,3 @@ python3 test_mcp_client.py
 🎉 [최종 검증 완료] 모든 MCP 표준 프로토콜 및 도구 호출 성공!
 ==================================================
 ```
-
