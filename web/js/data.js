@@ -45,8 +45,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	document.getElementById("chart-type").addEventListener("change", (e) => {
 		currentChartType = e.target.value;
-		// 차트 타입이 바뀌면 현재 활성화된 화면 리렌더링을 위해 버튼 강제클릭
-		document.querySelector(".filter-btn[style*='var(--hover-color)']")?.click() || document.getElementById("btn-custom-date").click();
+		if (window.currentFilteredData && window.currentFilteredData.length > 0) {
+			renderChart(window.currentFilteredData, currentChartType);
+		} else {
+			document.querySelector(".filter-btn[style*='var(--hover-color)']")?.click() || document.getElementById("btn-custom-date").click();
+		}
 	});
 
 	// ✨ 탭(Tab) 전환 버그 완벽 수정 (closest 사용) 및 차트 리사이즈 처리
@@ -239,30 +242,69 @@ function renderChart(data, type) {
 			},
 		];
 	} else {
-		const boxData = data.map((item, index) => {
-			const c = item.close || item.value;
-			let o = item.open;
-			if (o === undefined) o = index > 0 ? data[index - 1].close || data[index - 1].value : c * 0.999;
-			allPrices.push(o, c);
-			return [Math.min(o, c), Math.max(o, c)];
-		});
+		const boxData = [];
+		const boxColors = [];
+		const borderColors = [];
 
-		const boxColors = data.map((item, index) => {
-			const c = item.close || item.value;
-			let o = item.open;
-			if (o === undefined) o = index > 0 ? data[index - 1].close || data[index - 1].value : c * 0.999;
-			return c >= o ? "rgba(255, 77, 79, 0.8)" : "rgba(24, 144, 255, 0.8)";
+		data.forEach((item, index) => {
+			const c = Number(item.close || item.value);
+			let o = Number(item.open);
+
+			// 1. open 데이터가 유효하지 않거나 close와 동일한 경우(단일 종가 기반 시계열):
+			//    전일 종가를 시작 기준가(시가)로 설정하여 일별 등락폭(전일대비 변동)을 캔들 몸통으로 시각화
+			if (!o || o === c) {
+				if (index > 0) {
+					o = Number(data[index - 1].close || data[index - 1].value);
+				} else {
+					// 기간의 첫 번째 데이터: 전체 데이터셋에서 직전 영업일 탐색
+					const globalIdx = allStockData.findIndex((d) => d.date === item.date);
+					if (globalIdx > 0) {
+						o = Number(allStockData[globalIdx - 1].close || allStockData[globalIdx - 1].value);
+					} else {
+						o = c;
+					}
+				}
+			}
+
+			// 2. 전일과 당일 종가마저 동일하여 변동폭이 0인 경우 (보합, Doji):
+			//    Chart.js는 start === end이면 높이가 0px가 되어 캔버스가 아무것도 그리지 못하므로,
+			//    보합을 가시화하기 위한 최소 높이(±0.15% 또는 최소 50원)를 부여하여 Doji 가로선 형태로 렌더링
+			let minVal = Math.min(o, c);
+			let maxVal = Math.max(o, c);
+			const isFlat = Math.abs(maxVal - minVal) < 1;
+
+			if (isFlat) {
+				const delta = Math.max(c * 0.0015, 50);
+				minVal = c - delta;
+				maxVal = c + delta;
+			}
+
+			allPrices.push(minVal, maxVal);
+			boxData.push([minVal, maxVal]);
+
+			// 3. 색상 결정 (한국 증시 표준: 상승 빨강 / 하락 파랑 / 보합 회색)
+			if (isFlat) {
+				boxColors.push("rgba(140, 140, 140, 0.85)");
+				borderColors.push("#8c8c8c");
+			} else if (c > o) {
+				boxColors.push("rgba(255, 77, 79, 0.85)"); // 상승 (양봉 - 빨간색)
+				borderColors.push("#ff4d4f");
+			} else {
+				boxColors.push("rgba(24, 144, 255, 0.85)"); // 하락 (음봉 - 파란색)
+				borderColors.push("#1890ff");
+			}
 		});
 
 		datasets = [
 			{
 				type: "bar",
-				label: "시가-종가 변동폭",
+				label: "시가-종가 변동폭 (캔들)",
 				data: boxData,
 				backgroundColor: boxColors,
+				borderColor: borderColors,
 				borderWidth: 1,
-				borderColor: boxColors,
-				barPercentage: data.length === 1 ? 0.2 : 0.9,
+				barPercentage: data.length === 1 ? 0.3 : data.length > 100 ? 0.95 : 0.8,
+				categoryPercentage: 0.9,
 			},
 		];
 	}
@@ -276,6 +318,7 @@ function renderChart(data, type) {
 	if (stockChartInstance) stockChartInstance.destroy();
 
 	stockChartInstance = new Chart(ctx, {
+		type: type === "box" ? "bar" : "line",
 		data: { labels: labels, datasets: datasets },
 		options: {
 			responsive: true,
@@ -288,7 +331,9 @@ function renderChart(data, type) {
 					callbacks: {
 						label: function (context) {
 							if (Array.isArray(context.raw)) {
-								return `${context.dataset.label}: ${Math.round(context.raw[0]).toLocaleString()}원 ~ ${Math.round(context.raw[1]).toLocaleString()}원`;
+								const low = Math.round(context.raw[0]).toLocaleString();
+								const high = Math.round(context.raw[1]).toLocaleString();
+								return `변동폭: ${low}원 ~ ${high}원`;
 							}
 							return `${context.dataset.label}: ${Math.round(context.raw).toLocaleString()}원`;
 						},
