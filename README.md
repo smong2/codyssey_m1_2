@@ -121,7 +121,7 @@ Swagger UI (`/docs`)를 통해 대화형 API 테스트가 가능합니다.
 
 ## 🔗 배포 URL
 
-- **Frontend (Vercel)**: `https://codyssey-m1-2-9ht406z50-smong2.vercel.app/`
+- **Frontend (Vercel)**: `https://codyssey-m1-2-git-main-smong2.vercel.app/`
 - **Backend API (Render)**: `https://codyssey-m1-2-fimf.onrender.com`
 - **API Documentation (Swagger UI)**: `https://codyssey-m1-2-fimf.onrender.com/docs`
 
